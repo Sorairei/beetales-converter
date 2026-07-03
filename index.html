@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BeeTales Video to Audio Converter</title>
+    <meta
+      name="description"
+      content="Convert video files to audio locally in your browser with ffmpeg.wasm."
+    />
+    <meta name="theme-color" content="#080b12" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-labelledby="app-title">
+        <div class="intro">
+          <div class="brand-mark" aria-label="BeeTales">
+            <img src="assets/beetales-logo.png" alt="BeeTales logo" width="900" height="925" />
+            <div>
+              <p>BeeTales</p>
+              <span>Local converter</span>
+            </div>
+          </div>
+
+          <figure class="brand-visual">
+            <img
+              src="assets/beetales-converter-hero.png"
+              alt="Illustration of a video converting into an audio waveform with a download cue"
+              width="1792"
+              height="1024"
+            />
+            <figcaption class="brand-caption">
+              <span>BeeTales</span>
+              <h1 id="app-title">Video to Audio Converter</h1>
+            </figcaption>
+          </figure>
+
+          <p class="lead">
+            Extract audio from your videos as MP3, WAV, or AAC directly in your browser.
+          </p>
+          <div class="format-strip" aria-label="Available formats">
+            <span>MP3</span>
+            <span>WAV</span>
+            <span>AAC</span>
+          </div>
+        </div>
+
+        <div class="privacy-note" role="note">
+          <span aria-hidden="true"></span>
+          <p>Your files are never uploaded to a server. Everything is processed locally in your browser.</p>
+        </div>
+
+        <form class="converter-panel" id="converter-form">
+          <label class="drop-zone" for="video-file" id="drop-zone">
+            <input id="video-file" name="video-file" type="file" accept="video/*" />
+            <span class="drop-icon" aria-hidden="true"></span>
+            <span class="drop-title">Select a video file</span>
+            <span class="drop-hint">You can also drag and drop it here</span>
+          </label>
+
+          <div class="file-card is-hidden" id="file-card" aria-live="polite">
+            <div>
+              <p class="file-label">Selected file</p>
+              <p class="file-name" id="file-name"></p>
+            </div>
+            <p class="file-size" id="file-size"></p>
+          </div>
+
+          <div class="settings-grid">
+            <fieldset>
+              <legend>Output format</legend>
+              <div class="segmented-control">
+                <label>
+                  <input type="radio" name="format" value="mp3" checked />
+                  <span>MP3</span>
+                </label>
+                <label>
+                  <input type="radio" name="format" value="wav" />
+                  <span>WAV</span>
+                </label>
+                <label>
+                  <input type="radio" name="format" value="aac" />
+                  <span>AAC</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Bitrate</legend>
+              <div class="segmented-control">
+                <label>
+                  <input type="radio" name="bitrate" value="128k" checked />
+                  <span>128k</span>
+                </label>
+                <label>
+                  <input type="radio" name="bitrate" value="192k" />
+                  <span>192k</span>
+                </label>
+                <label>
+                  <input type="radio" name="bitrate" value="320k" />
+                  <span>320k</span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" id="convert-button" type="submit">
+              Convert to audio
+            </button>
+            <a class="download-button is-hidden" id="download-link" href="#" download>
+              Download audio
+            </a>
+          </div>
+
+          <div class="status-area" aria-live="polite">
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="status-message">Choose a video to get started.</p>
+            <p class="error-message is-hidden" id="error-message"></p>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="app.js?v=20260703-local-ffmpeg"></script>
+  </body>
+</html>

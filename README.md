@@ -17,6 +17,8 @@ This version includes two conversion modes:
 - Supports audio output as `mp3`, `wav`, and `aac`.
 - Supports WebM to MP4 video conversion.
 - Supports selecting, reviewing, and converting multiple files in one queue.
+- Supports optional time-based trimming with `MM:SS` or `HH:MM:SS` start and end values.
+- Provides smaller, balanced, and high-quality MP4 presets plus original, 1080p, 720p, and 480p resolution choices.
 - Lets users choose `128k`, `192k`, or `320k` bitrate.
 - Displays per-file and overall progress, individual download links, and before/after file sizes.
 - Modern responsive English interface.

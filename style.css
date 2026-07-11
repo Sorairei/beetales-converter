@@ -42,6 +42,7 @@ body {
 
 button,
 input,
+select,
 a {
   font: inherit;
 }
@@ -471,6 +472,68 @@ h1 {
   line-height: 1.45;
 }
 
+.mp4-settings {
+  margin-top: 22px;
+}
+
+.setting-select,
+.time-grid input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+  background: var(--panel-strong);
+  color: var(--text);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.setting-select {
+  padding: 0 40px 0 13px;
+  cursor: pointer;
+}
+
+.setting-select:focus,
+.time-grid input:focus {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(145, 48, 209, 0.14);
+}
+
+.trim-settings {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.time-grid label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.time-grid input {
+  padding: 0 13px;
+}
+
+.time-grid input::placeholder {
+  color: #657186;
+}
+
+.setting-help {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 fieldset {
   min-width: 0;
   margin: 0;
@@ -831,6 +894,10 @@ legend {
   }
 
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .time-grid {
     grid-template-columns: 1fr;
   }
 

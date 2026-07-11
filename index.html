@@ -136,6 +136,41 @@
             </fieldset>
           </div>
 
+          <div class="settings-grid mp4-settings is-hidden" id="mp4-settings">
+            <fieldset>
+              <legend>Video quality</legend>
+              <select class="setting-select" id="video-quality" name="video-quality">
+                <option value="28">Smaller file</option>
+                <option value="23" selected>Balanced</option>
+                <option value="18">High quality</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Resolution</legend>
+              <select class="setting-select" id="video-resolution" name="video-resolution">
+                <option value="original" selected>Original</option>
+                <option value="1080">1080p</option>
+                <option value="720">720p</option>
+                <option value="480">480p</option>
+              </select>
+            </fieldset>
+          </div>
+
+          <fieldset class="trim-settings">
+            <legend>Trim (optional)</legend>
+            <div class="time-grid">
+              <label>
+                <span>Start time</span>
+                <input id="trim-start" name="trim-start" type="text" inputmode="numeric" placeholder="00:00" autocomplete="off" />
+              </label>
+              <label>
+                <span>End time</span>
+                <input id="trim-end" name="trim-end" type="text" inputmode="numeric" placeholder="Full length" autocomplete="off" />
+              </label>
+            </div>
+            <p class="setting-help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
+          </fieldset>
+
           <div class="mp4-note is-hidden" id="mp4-note">
             MP4 conversion uses local ffmpeg.wasm and may take longer than audio extraction.
           </div>
@@ -168,6 +203,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=20260711-batch-queue"></script>
+    <script type="module" src="app.js?v=20260711-trim-quality"></script>
   </body>
 </html>

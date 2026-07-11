@@ -17,7 +17,12 @@ const progressBar = $("#progress-bar");
 const statusMessage = $("#status-message");
 const errorMessage = $("#error-message");
 const audioSettings = $("#audio-settings");
+const mp4Settings = $("#mp4-settings");
 const mp4Note = $("#mp4-note");
+const videoQuality = $("#video-quality");
+const videoResolution = $("#video-resolution");
+const trimStart = $("#trim-start");
+const trimEnd = $("#trim-end");
 const resultsPanel = $("#results-panel");
 const resultsList = $("#results-list");
 const resultsSummary = $("#results-summary");
@@ -141,6 +146,13 @@ async function convertQueue() {
   setProgress(0);
   if (!selectedFiles.length) { showError(mode === "mp4" ? "Please select WebM video files first." : "Please select video files first."); return; }
 
+  const trim = getTrimSettings();
+  if (trim.error) {
+    showError(trim.error);
+    trimStart.focus();
+    return;
+  }
+
   const results = [];
   try {
     setBusy(true);
@@ -149,7 +161,7 @@ async function convertQueue() {
       const file = selectedFiles[activeFileIndex];
       setStatus(`Preparing file ${activeFileIndex + 1} of ${selectedFiles.length}: ${file.name}`);
       try {
-        results.push(await convertFile(file, mode, activeFileIndex));
+        results.push(await convertFile(file, mode, activeFileIndex, trim));
       } catch (error) {
         console.error(error);
         results.push({ file, error: getFriendlyError(error, mode) });
@@ -170,7 +182,7 @@ async function convertQueue() {
   }
 }
 
-async function convertFile(file, mode, index) {
+async function convertFile(file, mode, index, trim) {
   const token = `${Date.now()}-${index}`;
   const inputName = `input-${token}.${getFileExtension(file.name) || "video"}`;
   const outputName = getOutputName(file.name, mode);
@@ -179,8 +191,8 @@ async function convertFile(file, mode, index) {
   try {
     await ffmpeg.writeFile(inputName, await fetchFile(file));
     wroteInput = true;
-    let exitCode = await ffmpeg.exec(mode === "mp4" ? getMp4Args(inputName, outputName, "h264") : getAudioArgs(inputName, outputName));
-    if (mode === "mp4" && exitCode !== 0) exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4"));
+    let exitCode = await ffmpeg.exec(mode === "mp4" ? getMp4Args(inputName, outputName, "h264", trim) : getAudioArgs(inputName, outputName, trim));
+    if (mode === "mp4" && exitCode !== 0) exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4", trim));
     if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
     wroteOutput = true;
     const data = await ffmpeg.readFile(outputName);
@@ -221,15 +233,44 @@ function renderResults(results, mode) {
   });
 }
 
-function getAudioArgs(inputName, outputName) {
+function getAudioArgs(inputName, outputName, trim) {
   const format = getCheckedValue("format");
   const bitrate = getCheckedValue("bitrate");
-  return ["-hide_banner", "-y", "-i", inputName, ...audioOutputArgs[format], ...(format === "wav" ? [] : ["-b:a", bitrate]), outputName];
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), ...audioOutputArgs[format], ...(format === "wav" ? [] : ["-b:a", bitrate]), outputName];
 }
 
-function getMp4Args(inputName, outputName, encoder) {
-  const videoArgs = encoder === "mpeg4" ? ["-c:v", "mpeg4", "-q:v", "5"] : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"];
-  return ["-hide_banner", "-y", "-i", inputName, "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
+function getMp4Args(inputName, outputName, encoder, trim) {
+  const crf = videoQuality.value;
+  const fallbackQuality = crf === "18" ? "3" : crf === "28" ? "8" : "5";
+  const videoArgs = encoder === "mpeg4" ? ["-c:v", "mpeg4", "-q:v", fallbackQuality] : ["-c:v", "libx264", "-preset", "veryfast", "-crf", crf];
+  const scaleArgs = videoResolution.value === "original" ? [] : ["-vf", `scale=w=-2:h=${videoResolution.value}:force_original_aspect_ratio=decrease`];
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, ...scaleArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
+}
+
+function getTrimSettings() {
+  const start = parseTimeValue(trimStart.value);
+  const end = parseTimeValue(trimEnd.value);
+  if (start === null || end === null) return { error: "Enter trim times as MM:SS or HH:MM:SS, for example 01:30." };
+  if (end !== undefined && end <= (start || 0)) return { error: "End time must be later than start time." };
+  return { start, end };
+}
+
+function parseTimeValue(value) {
+  const clean = value.trim();
+  if (!clean) return undefined;
+  const parts = clean.split(":");
+  if (parts.length < 1 || parts.length > 3 || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part))) return null;
+  if (parts.length > 1 && parts.slice(1).some((part) => Number(part) >= 60)) return null;
+  return parts.reduce((seconds, part) => seconds * 60 + Number(part), 0);
+}
+
+function getTrimInputArgs(trim) {
+  return trim.start !== undefined ? ["-ss", String(trim.start)] : [];
+}
+
+function getTrimDurationArgs(trim) {
+  if (trim.end === undefined) return [];
+  return ["-t", String(trim.end - (trim.start || 0))];
 }
 
 async function loadFfmpeg() {
@@ -277,6 +318,7 @@ function updateModeUI({ resetFiles }) {
   const mode = getMode();
   const isMp4 = mode === "mp4";
   audioSettings.classList.toggle("is-hidden", isMp4);
+  mp4Settings.classList.toggle("is-hidden", !isMp4);
   mp4Note.classList.toggle("is-hidden", !isMp4);
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
@@ -290,6 +332,10 @@ function setBusy(busy) {
   convertButton.disabled = busy;
   fileInput.disabled = busy;
   clearFilesButton.disabled = busy;
+  videoQuality.disabled = busy;
+  videoResolution.disabled = busy;
+  trimStart.disabled = busy;
+  trimEnd.disabled = busy;
   modeInputs.forEach((input) => { input.disabled = busy; });
   convertButton.textContent = busy ? modeContent[getMode()].busy : modeContent[getMode()].button;
 }

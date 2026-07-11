@@ -6,7 +6,7 @@
     <title>BeeTales Media Converter</title>
     <meta
       name="description"
-      content="Convert video files locally in your browser with ffmpeg.wasm. Extract audio or convert WebM to MP4 without uploading files."
+      content="Convert video files locally in your browser with ffmpeg.wasm. Extract audio, convert WebM, or optimize MP4 without uploading files."
     />
     <meta name="theme-color" content="#080b12" />
     <link rel="stylesheet" href="style.css" />
@@ -37,7 +37,7 @@
           </figure>
 
           <p class="lead">
-            Extract audio from video files or convert WebM videos to MP4 directly in your browser.
+            Extract audio, convert WebM, or resize, trim, and optimize MP4 directly in your browser.
           </p>
           <div class="format-strip" aria-label="Available conversion options">
             <span>MP3</span>
@@ -74,8 +74,8 @@
               <label>
                 <input type="radio" name="mode" value="mp4" />
                 <span>
-                  <strong>WebM to MP4</strong>
-                  <small>Convert WebM videos for upload compatibility</small>
+                  <strong>Convert or optimize MP4</strong>
+                  <small>WebM/MP4 to resized, trimmed, or compressed MP4</small>
                 </span>
               </label>
             </div>
@@ -183,7 +183,7 @@
           </fieldset>
 
           <div class="mp4-note is-hidden" id="mp4-note">
-            MP4 conversion uses local ffmpeg.wasm and may take longer than audio extraction.
+            MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
           </div>
 
           <div class="actions">

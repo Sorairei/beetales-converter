@@ -1,6 +1,6 @@
 # BeeTales Media Converter
 
-A static web app for converting media files directly in the browser with ffmpeg.wasm. It can extract audio from videos and convert WebM videos to MP4 without a backend, database, cookies, analytics, or online conversion service.
+A static web app for converting media files directly in the browser with ffmpeg.wasm. It can extract audio, convert WebM to MP4, and optimize existing MP4 videos without a backend, database, cookies, analytics, or online conversion service.
 
 ## Current Version
 
@@ -9,13 +9,14 @@ This version includes two conversion modes:
 | Mode | Input | Output | Purpose |
 | --- | --- | --- | --- |
 | Extract audio | Video files such as MP4, MOV, MKV, WebM | MP3, WAV, AAC | Create audio files from video sources |
-| WebM to MP4 | `.webm` video files | MP4 | Convert WebM videos for better upload and platform compatibility |
+| Convert or optimize MP4 | `.webm` and `.mp4` video files | MP4 | Convert WebM or resize, trim, and recompress existing MP4 videos |
 
 ## Features
 
 - Local browser-based conversion, with no server uploads.
 - Supports audio output as `mp3`, `wav`, and `aac`.
 - Supports WebM to MP4 video conversion.
+- Supports MP4-to-MP4 optimization with trimming, resolution, and quality controls.
 - Supports selecting, reviewing, and converting multiple files in one queue.
 - Supports optional time-based trimming with `MM:SS` or `HH:MM:SS` start and end values.
 - Provides smaller, balanced, and high-quality MP4 presets plus original, 1080p, 720p, and 480p resolution choices.
@@ -170,8 +171,8 @@ sudo certbot --nginx -d your-domain.com
 
 - The first conversion can take longer because the browser loads ffmpeg.wasm from local static files.
 - Large files require more memory and processing time.
-- WebM to MP4 conversion is more CPU-intensive than audio extraction and may take longer.
-- If the WebM to MP4 mode appears on screen but does not update the form when selected, the browser is probably blocking `app.js` because the app was opened with `file://`. Serve the folder from a local web server or GitHub Pages.
+- MP4 conversion and optimization are more CPU-intensive than audio extraction and may take longer.
+- If the MP4 mode appears on screen but does not update the form when selected, the browser is probably blocking `app.js` because the app was opened with `file://`. Serve the folder from a local web server or GitHub Pages.
 - If a `Worker` or `SecurityError` appears, verify that the browser is loading the current `app.js` version and that the `vendor/ffmpeg` folder was fully deployed.
 - If ffmpeg finishes without generating a file, make sure the video contains a compatible audio track.
 - The app does not depend on a CDN during conversion. It serves `@ffmpeg/ffmpeg`, `@ffmpeg/core`, and `@ffmpeg/util` locally from `vendor/ffmpeg`.

@@ -60,9 +60,9 @@ const modeContent = {
     dropHint: "You can also drag and drop them here", accept: "video/*,.webm", download: "Download audio",
   },
   mp4: {
-    button: "Convert queue to MP4", busy: "Converting to MP4...", ready: "WebM video(s) ready for MP4 conversion.",
-    empty: "Choose one or more WebM videos to get started.", dropTitle: "Select one or more WebM videos",
-    dropHint: "Drop .webm files here or choose them from your device", accept: "video/webm,.webm", download: "Download MP4",
+    button: "Convert queue to MP4", busy: "Converting to MP4...", ready: "video(s) ready for MP4 conversion or optimization.",
+    empty: "Choose one or more WebM or MP4 videos to get started.", dropTitle: "Select WebM or MP4 videos",
+    dropHint: "Drop .webm or .mp4 files here or choose them from your device", accept: "video/webm,video/mp4,.webm,.mp4", download: "Download MP4",
   },
 };
 
@@ -169,7 +169,7 @@ async function convertQueue() {
   clearError();
   resetResults();
   setProgress(0);
-  if (!selectedFiles.length) { showError(mode === "mp4" ? "Please select WebM video files first." : "Please select video files first."); return; }
+  if (!selectedFiles.length) { showError(mode === "mp4" ? "Please select WebM or MP4 video files first." : "Please select video files first."); return; }
 
   const trim = getTrimSettings();
   if (trim.error) {
@@ -458,17 +458,18 @@ function getFriendlyError(error, mode) {
   if (message.includes("timeout") || message.includes("abort")) return "The conversion engine took too long to load. Refresh and try again.";
   if (message.includes("memory")) return "The browser ran out of memory. Try fewer or smaller files.";
   if (message.includes("empty-output")) return "No output file was generated.";
-  if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) return mode === "mp4" ? "This WebM file could not be converted to MP4." : "No compatible audio track was found.";
-  return mode === "mp4" ? "This WebM video could not be converted to MP4." : "This video could not be converted.";
+  if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "No compatible audio track was found.";
+  return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "This video could not be converted.";
 }
 
-function getValidationMessage(mode) { return mode === "mp4" ? "Please select one or more .webm video files." : "The selected files do not appear to be compatible videos."; }
+function getValidationMessage(mode) { return mode === "mp4" ? "Please select one or more .webm or .mp4 video files." : "The selected files do not appear to be compatible videos."; }
 function getCheckedValue(name) { return document.querySelector(`input[name="${name}"]:checked`).value; }
 function getMode() { return getCheckedValue("mode"); }
-function isValidFileForMode(file, mode) { return mode === "mp4" ? isWebmFile(file) : isVideoFile(file); }
+function isValidFileForMode(file, mode) { return mode === "mp4" ? isMp4SourceFile(file) : isVideoFile(file); }
 function isVideoFile(file) { return file.type.startsWith("video/") || ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"].includes(getFileExtension(file.name)); }
 function isWebmFile(file) { return file.type === "video/webm" || getFileExtension(file.name) === "webm"; }
-function getOutputName(name, mode) { return `${safeBaseName(name)}.${getOutputExtension(mode)}`; }
+function isMp4SourceFile(file) { return isWebmFile(file) || file.type === "video/mp4" || getFileExtension(file.name) === "mp4"; }
+function getOutputName(name, mode) { const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : ""; return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`; }
 function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : getCheckedValue("format"); }
 function getSizeComparison(input, output) {
   const difference = input ? Math.round((1 - output / input) * 100) : 0;

@@ -31,7 +31,9 @@ const trimEnd = $("#trim-end");
 const resultsPanel = $("#results-panel");
 const resultsList = $("#results-list");
 const resultsSummary = $("#results-summary");
+const downloadAllButton = $("#download-all");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution');
 
 const ffmpeg = new FFmpeg();
 let ffmpegReady = false;
@@ -41,10 +43,12 @@ let resultUrls = [];
 let activeFileIndex = 0;
 let previewUrl = null;
 let cancelRequested = false;
+let completedResults = [];
 const fileMetadata = new Map();
 const fileStates = new Map();
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
+const PREFERENCES_KEY = "beetales-converter-preferences-v1";
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
 const ffmpegWasmURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.wasm");
 const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4" };
@@ -76,6 +80,7 @@ ffmpeg.on("progress", ({ progress }) => {
 
 fileInput.addEventListener("change", () => handleFiles(fileInput.files));
 modeInputs.forEach((input) => input.addEventListener("change", () => updateModeUI({ resetFiles: true })));
+preferenceInputs.forEach((input) => input.addEventListener("change", savePreferences));
 dropZone.addEventListener("dragover", (event) => { event.preventDefault(); dropZone.classList.add("is-dragging"); });
 dropZone.addEventListener("dragleave", () => dropZone.classList.remove("is-dragging"));
 dropZone.addEventListener("drop", (event) => {
@@ -85,8 +90,10 @@ dropZone.addEventListener("drop", (event) => {
 });
 clearFilesButton.addEventListener("click", clearSelection);
 cancelButton.addEventListener("click", cancelConversion);
+downloadAllButton.addEventListener("click", downloadAllResults);
 form.addEventListener("submit", async (event) => { event.preventDefault(); await convertQueue(); });
 window.addEventListener("beforeunload", () => { resetResults(); resetPreview(); });
+restorePreferences();
 updateModeUI({ resetFiles: false });
 
 async function handleFiles(fileCollection) {
@@ -320,7 +327,9 @@ function renderResults(results, mode) {
   resultsList.replaceChildren();
   resultsPanel.classList.remove("is-hidden");
   const completed = results.filter((result) => !result.error);
+  completedResults = completed;
   resultsSummary.textContent = `${completed.length}/${results.length} completed`;
+  downloadAllButton.classList.toggle("is-hidden", completed.length < 2);
   results.forEach((result) => {
     const card = document.createElement("article");
     card.className = `result-card${result.error ? " has-error" : ""}`;
@@ -341,6 +350,14 @@ function renderResults(results, mode) {
     }
     resultsList.append(card);
   });
+}
+
+function downloadAllResults() {
+  if (!completedResults.length) return;
+  downloadAllButton.disabled = true;
+  setStatus(`Starting ${completedResults.length} downloads. Your browser may ask for permission to download multiple files.`);
+  completedResults.forEach((result) => forceDownload(result.url, result.outputName));
+  downloadAllButton.disabled = false;
 }
 
 function getAudioArgs(inputName, outputName, trim) {
@@ -414,8 +431,42 @@ function releaseFfmpegMemory() {
 function resetResults() {
   resultUrls.forEach((url) => URL.revokeObjectURL(url));
   resultUrls = [];
+  completedResults = [];
   resultsList.replaceChildren();
   resultsPanel.classList.add("is-hidden");
+  downloadAllButton.classList.add("is-hidden");
+}
+
+function savePreferences() {
+  const preferences = {
+    mode: getMode(),
+    format: getCheckedValue("format"),
+    bitrate: getCheckedValue("bitrate"),
+    quality: videoQuality.value,
+    resolution: videoResolution.value,
+  };
+  try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
+}
+
+function restorePreferences() {
+  try {
+    const preferences = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
+    if (!preferences) return;
+    setCheckedValue("mode", preferences.mode);
+    setCheckedValue("format", preferences.format);
+    setCheckedValue("bitrate", preferences.bitrate);
+    setSelectValue(videoQuality, preferences.quality);
+    setSelectValue(videoResolution, preferences.resolution);
+  } catch { /* Invalid or unavailable storage falls back to defaults. */ }
+}
+
+function setCheckedValue(name, value) {
+  const input = Array.from(document.querySelectorAll(`input[name="${name}"]`)).find((candidate) => candidate.value === value);
+  if (input) input.checked = true;
+}
+
+function setSelectValue(select, value) {
+  if (Array.from(select.options).some((option) => option.value === value)) select.value = value;
 }
 
 function forceDownload(url, filename) {

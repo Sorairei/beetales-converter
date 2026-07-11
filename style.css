@@ -805,10 +805,38 @@ legend {
   font-size: 1.05rem;
 }
 
-.results-heading > span {
+.results-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.results-tools > span {
   color: var(--success);
   font-size: 0.8rem;
   font-weight: 850;
+}
+
+.download-all-button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 6px;
+  background: rgba(129, 140, 248, 0.12);
+  color: #c7d2fe;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.download-all-button:hover {
+  background: rgba(129, 140, 248, 0.2);
+}
+
+.download-all-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .results-list {
@@ -987,6 +1015,16 @@ legend {
 
   .result-card {
     grid-template-columns: 1fr;
+  }
+
+  .results-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .results-tools {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .file-size {

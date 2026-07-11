@@ -949,6 +949,51 @@ legend {
   display: none;
 }
 
+.reset-floating-button {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 20;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  border-radius: 999px;
+  background: rgba(17, 23, 34, 0.92);
+  color: #f3e8ff;
+  cursor: pointer;
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.reset-floating-button span {
+  color: var(--accent-strong);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.reset-floating-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(35, 24, 50, 0.96);
+  transform: translateY(-2px);
+}
+
+.reset-floating-button:focus-visible {
+  outline: 3px solid rgba(168, 85, 247, 0.35);
+  outline-offset: 3px;
+}
+
+.reset-floating-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
 @media (max-width: 860px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -981,8 +1026,15 @@ legend {
 
 @media (max-width: 580px) {
   .app-shell {
-    padding: 20px 12px;
+    padding: 20px 12px 82px;
     place-items: start center;
+  }
+
+  .reset-floating-button {
+    right: 14px;
+    bottom: 14px;
+    min-height: 44px;
+    padding: 0 14px;
   }
 
   .lead {

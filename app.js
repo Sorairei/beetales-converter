@@ -36,6 +36,7 @@ const resultsPanel = $("#results-panel");
 const resultsList = $("#results-list");
 const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
+const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
 const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution, #gif-width, #gif-fps');
 
@@ -100,6 +101,7 @@ dropZone.addEventListener("drop", (event) => {
 clearFilesButton.addEventListener("click", clearSelection);
 cancelButton.addEventListener("click", cancelConversion);
 downloadAllButton.addEventListener("click", downloadAllResults);
+resetDefaultsButton.addEventListener("click", restoreAllDefaults);
 form.addEventListener("submit", async (event) => { event.preventDefault(); await convertQueue(); });
 window.addEventListener("beforeunload", () => { resetResults(); resetPreview(); });
 restorePreferences();
@@ -494,6 +496,24 @@ function restorePreferences() {
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
+function restoreAllDefaults() {
+  clearSelection();
+  setCheckedValue("mode", "audio");
+  setCheckedValue("format", "mp3");
+  setCheckedValue("bitrate", "128k");
+  videoQuality.value = "23";
+  videoResolution.value = "original";
+  gifWidth.value = "480";
+  gifFps.value = "12";
+  trimStart.value = "";
+  trimEnd.value = "";
+  try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
+  updateModeUI({ resetFiles: false });
+  clearError();
+  setProgress(0);
+  setStatus("All settings and files were restored to defaults.");
+}
+
 function setCheckedValue(name, value) {
   const input = Array.from(document.querySelectorAll(`input[name="${name}"]`)).find((candidate) => candidate.value === value);
   if (input) input.checked = true;
@@ -536,6 +556,7 @@ function setBusy(busy) {
   gifFps.disabled = busy;
   trimStart.disabled = busy;
   trimEnd.disabled = busy;
+  resetDefaultsButton.disabled = busy;
   cancelButton.classList.toggle("is-hidden", !busy);
   cancelButton.disabled = !busy;
   modeInputs.forEach((input) => { input.disabled = busy; });

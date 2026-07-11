@@ -98,6 +98,17 @@
             <ol class="file-list" id="file-list"></ol>
           </div>
 
+          <section class="preview-panel is-hidden" id="preview-panel">
+            <div class="preview-heading">
+              <div>
+                <p class="file-label">Preview</p>
+                <h2 id="preview-title"></h2>
+              </div>
+              <span id="preview-meta"></span>
+            </div>
+            <video id="video-preview" controls preload="metadata"></video>
+          </section>
+
           <div class="settings-grid" id="audio-settings">
             <fieldset>
               <legend>Output format</legend>
@@ -179,6 +190,9 @@
             <button class="primary-button" id="convert-button" type="submit">
               Convert to audio
             </button>
+            <button class="cancel-button is-hidden" id="cancel-button" type="button">
+              Cancel conversion
+            </button>
           </div>
 
           <section class="results-panel is-hidden" id="results-panel" aria-live="polite">
@@ -203,6 +217,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=20260711-trim-quality"></script>
+    <script type="module" src="app.js?v=20260711-preview-cancel"></script>
   </body>
 </html>

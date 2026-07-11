@@ -13,6 +13,11 @@ const fileSize = $("#file-size");
 const fileList = $("#file-list");
 const clearFilesButton = $("#clear-files");
 const convertButton = $("#convert-button");
+const cancelButton = $("#cancel-button");
+const previewPanel = $("#preview-panel");
+const previewTitle = $("#preview-title");
+const previewMeta = $("#preview-meta");
+const videoPreview = $("#video-preview");
 const progressBar = $("#progress-bar");
 const statusMessage = $("#status-message");
 const errorMessage = $("#error-message");
@@ -34,6 +39,10 @@ let ffmpegLoadPromise = null;
 let selectedFiles = [];
 let resultUrls = [];
 let activeFileIndex = 0;
+let previewUrl = null;
+let cancelRequested = false;
+const fileMetadata = new Map();
+const fileStates = new Map();
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
@@ -75,11 +84,12 @@ dropZone.addEventListener("drop", (event) => {
   handleFiles(event.dataTransfer.files);
 });
 clearFilesButton.addEventListener("click", clearSelection);
+cancelButton.addEventListener("click", cancelConversion);
 form.addEventListener("submit", async (event) => { event.preventDefault(); await convertQueue(); });
-window.addEventListener("beforeunload", resetResults);
+window.addEventListener("beforeunload", () => { resetResults(); resetPreview(); });
 updateModeUI({ resetFiles: false });
 
-function handleFiles(fileCollection) {
+async function handleFiles(fileCollection) {
   clearError();
   resetResults();
   setProgress(0);
@@ -88,6 +98,9 @@ function handleFiles(fileCollection) {
   const validFiles = incoming.filter((file) => isValidFileForMode(file, mode));
   const rejected = incoming.length - validFiles.length;
   selectedFiles = validFiles;
+  fileMetadata.clear();
+  fileStates.clear();
+  selectedFiles.forEach((file) => fileStates.set(file, "Loading details..."));
   fileInput.value = "";
   renderQueue();
 
@@ -98,6 +111,10 @@ function handleFiles(fileCollection) {
   }
   if (rejected) showError(`${rejected} incompatible file${rejected === 1 ? " was" : "s were"} left out of the queue.`);
   setStatus(`${selectedFiles.length} ${modeContent[mode].ready}`);
+  showPreview(selectedFiles[0]);
+  await Promise.all(selectedFiles.map(loadMediaMetadata));
+  renderQueue();
+  updatePreviewMetadata(selectedFiles[0]);
 }
 
 function renderQueue() {
@@ -111,17 +128,22 @@ function renderQueue() {
     const details = document.createElement("span");
     const name = document.createElement("strong");
     const size = document.createElement("small");
+    const state = document.createElement("em");
     const remove = document.createElement("button");
     name.textContent = file.name;
     size.textContent = formatBytes(file.size);
-    details.append(name, size);
+    state.textContent = fileStates.get(file) || formatMediaMetadata(fileMetadata.get(file));
+    details.append(name, size, state);
     remove.type = "button";
     remove.textContent = "Remove";
     remove.setAttribute("aria-label", `Remove ${file.name}`);
     remove.addEventListener("click", () => {
       selectedFiles.splice(index, 1);
+      fileMetadata.delete(file);
+      fileStates.delete(file);
       resetResults();
       renderQueue();
+      showPreview(selectedFiles[0]);
       setStatus(selectedFiles.length ? `${selectedFiles.length} ${modeContent[getMode()].ready}` : modeContent[getMode()].empty);
     });
     item.append(details, remove);
@@ -133,6 +155,9 @@ function clearSelection() {
   selectedFiles = [];
   fileInput.value = "";
   resetResults();
+  resetPreview();
+  fileMetadata.clear();
+  fileStates.clear();
   clearError();
   setProgress(0);
   renderQueue();
@@ -152,20 +177,33 @@ async function convertQueue() {
     trimStart.focus();
     return;
   }
+  const trimRangeError = getTrimRangeError(trim);
+  if (trimRangeError) {
+    showError(trimRangeError);
+    trimEnd.focus();
+    return;
+  }
 
   const results = [];
   try {
+    cancelRequested = false;
     setBusy(true);
     await loadFfmpeg();
     for (activeFileIndex = 0; activeFileIndex < selectedFiles.length; activeFileIndex += 1) {
       const file = selectedFiles[activeFileIndex];
+      fileStates.set(file, "Converting...");
+      renderQueue();
       setStatus(`Preparing file ${activeFileIndex + 1} of ${selectedFiles.length}: ${file.name}`);
       try {
         results.push(await convertFile(file, mode, activeFileIndex, trim));
+        fileStates.set(file, "Completed");
       } catch (error) {
+        if (cancelRequested) throw new Error("conversion-cancelled");
         console.error(error);
         results.push({ file, error: getFriendlyError(error, mode) });
+        fileStates.set(file, "Error");
       }
+      renderQueue();
     }
     renderResults(results, mode);
     const completed = results.filter((result) => !result.error).length;
@@ -174,12 +212,84 @@ async function convertQueue() {
     if (completed < results.length) showError(`${results.length - completed} file${results.length - completed === 1 ? " could" : "s could"} not be converted. See the results below.`);
   } catch (error) {
     console.error(error);
-    showError(getFriendlyError(error, mode));
-    setStatus("The conversion queue stopped.");
+    if (cancelRequested || String(error?.message).includes("cancelled")) {
+      fileStates.set(selectedFiles[activeFileIndex], "Cancelled");
+      renderQueue();
+      setStatus("Conversion cancelled. Completed downloads remain available.");
+      if (results.length) renderResults(results, mode);
+    } else {
+      showError(getFriendlyError(error, mode));
+      setStatus("The conversion queue stopped.");
+    }
   } finally {
     releaseFfmpegMemory();
     setBusy(false);
   }
+}
+
+function cancelConversion() {
+  if (cancelRequested) return;
+  cancelRequested = true;
+  cancelButton.disabled = true;
+  setStatus("Cancelling the current conversion...");
+  releaseFfmpegMemory();
+}
+
+function showPreview(file) {
+  resetPreview();
+  if (!file) return;
+  previewUrl = URL.createObjectURL(file);
+  videoPreview.src = previewUrl;
+  previewTitle.textContent = file.name;
+  previewMeta.textContent = "Loading details...";
+  previewPanel.classList.remove("is-hidden");
+}
+
+function resetPreview() {
+  videoPreview.pause();
+  videoPreview.removeAttribute("src");
+  videoPreview.load();
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = null;
+  previewPanel.classList.add("is-hidden");
+}
+
+function loadMediaMetadata(file) {
+  return new Promise((resolve) => {
+    const probe = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    const finish = (metadata) => {
+      fileMetadata.set(file, metadata);
+      fileStates.set(file, formatMediaMetadata(metadata));
+      URL.revokeObjectURL(url);
+      probe.removeAttribute("src");
+      resolve();
+    };
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => finish({ duration: probe.duration, width: probe.videoWidth, height: probe.videoHeight });
+    probe.onerror = () => finish(null);
+    probe.src = url;
+  });
+}
+
+function updatePreviewMetadata(file) {
+  if (!file || !previewUrl) return;
+  previewMeta.textContent = formatMediaMetadata(fileMetadata.get(file));
+}
+
+function formatMediaMetadata(metadata) {
+  if (!metadata || !Number.isFinite(metadata.duration)) return "Details unavailable";
+  const dimensions = metadata.width && metadata.height ? ` · ${metadata.width}×${metadata.height}` : "";
+  return `${formatDuration(metadata.duration)}${dimensions}`;
+}
+
+function getTrimRangeError(trim) {
+  const durations = selectedFiles.map((file) => fileMetadata.get(file)?.duration).filter(Number.isFinite);
+  if (!durations.length) return "";
+  const shortest = Math.min(...durations);
+  if (trim.start !== undefined && trim.start >= shortest) return `Start time must be before ${formatDuration(shortest)}, the end of the shortest file.`;
+  if (trim.end !== undefined && trim.end > shortest) return `End time cannot exceed ${formatDuration(shortest)}, the duration of the shortest file.`;
+  return "";
 }
 
 async function convertFile(file, mode, index, trim) {
@@ -336,6 +446,8 @@ function setBusy(busy) {
   videoResolution.disabled = busy;
   trimStart.disabled = busy;
   trimEnd.disabled = busy;
+  cancelButton.classList.toggle("is-hidden", !busy);
+  cancelButton.disabled = !busy;
   modeInputs.forEach((input) => { input.disabled = busy; });
   convertButton.textContent = busy ? modeContent[getMode()].busy : modeContent[getMode()].button;
 }
@@ -364,6 +476,7 @@ function getSizeComparison(input, output) {
   return `${formatBytes(input)} → ${formatBytes(output)} · ${change}`;
 }
 function formatBytes(bytes) { if (!bytes) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); const value = bytes / 1024 ** index; return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`; }
+function formatDuration(seconds) { const total = Math.max(0, Math.floor(seconds)); const hours = Math.floor(total / 3600); const minutes = Math.floor((total % 3600) / 60); const secs = total % 60; return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}` : `${minutes}:${String(secs).padStart(2, "0")}`; }
 function getFileExtension(name) { return name.includes(".") ? name.split(".").pop().toLowerCase() : ""; }
 function safeBaseName(name) { return name.replace(/\.[^/.]+$/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "converted-media"; }
 function localAssetURL(path) { return new URL(path, window.location.href).href; }

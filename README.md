@@ -19,6 +19,10 @@ This version includes two conversion modes:
 - Supports selecting, reviewing, and converting multiple files in one queue.
 - Supports optional time-based trimming with `MM:SS` or `HH:MM:SS` start and end values.
 - Provides smaller, balanced, and high-quality MP4 presets plus original, 1080p, 720p, and 480p resolution choices.
+- Shows a local preview with duration and resolution before conversion.
+- Tracks pending, active, completed, failed, and cancelled queue items individually.
+- Validates trim values against the real duration of the selected files.
+- Lets users safely cancel an active conversion while keeping completed results available.
 - Lets users choose `128k`, `192k`, or `320k` bitrate.
 - Displays per-file and overall progress, individual download links, and before/after file sizes.
 - Modern responsive English interface.

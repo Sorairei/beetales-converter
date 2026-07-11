@@ -429,6 +429,54 @@ h1 {
   color: var(--muted);
 }
 
+.file-list em {
+  display: block;
+  margin-top: 4px;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.preview-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.preview-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.preview-heading h2 {
+  max-width: 290px;
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 0.94rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-heading > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-align: right;
+}
+
+.preview-panel video {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 6px;
+  background: #05070b;
+}
+
 .file-label,
 .file-name,
 .file-size {
@@ -672,6 +720,7 @@ legend {
 }
 
 .primary-button,
+.cancel-button,
 .download-button,
 .open-button {
   min-height: 50px;
@@ -701,6 +750,23 @@ legend {
   cursor: not-allowed;
   opacity: 0.64;
   box-shadow: none;
+}
+
+.cancel-button {
+  flex: 1 1 180px;
+  border: 1px solid rgba(251, 113, 133, 0.42);
+  background: rgba(251, 113, 133, 0.1);
+  color: #fecdd3;
+  cursor: pointer;
+}
+
+.cancel-button:hover {
+  background: rgba(251, 113, 133, 0.18);
+}
+
+.cancel-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .download-button,
@@ -944,6 +1010,7 @@ legend {
   }
 
   .primary-button,
+  .cancel-button,
   .download-button,
   .open-button {
     width: 100%;

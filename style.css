@@ -271,6 +271,42 @@ h1 {
   font-weight: 850;
 }
 
+.sponsor-button {
+  width: fit-content;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 105, 180, 0.38);
+  border-radius: 7px;
+  background: rgba(219, 61, 140, 0.12);
+  color: #fbcfe8;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.sponsor-button span {
+  color: #f472b6;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sponsor-button:hover {
+  border-color: rgba(244, 114, 182, 0.72);
+  background: rgba(219, 61, 140, 0.2);
+  transform: translateY(-1px);
+}
+
+.sponsor-button:focus-visible {
+  outline: 3px solid rgba(244, 114, 182, 0.28);
+  outline-offset: 3px;
+}
+
 .converter-panel {
   grid-column: 2;
   grid-row: 1 / span 2;
@@ -1126,6 +1162,10 @@ legend {
 
   .privacy-mascot {
     width: 82px;
+  }
+
+  .sponsor-button {
+    width: 100%;
   }
 
   .primary-button,

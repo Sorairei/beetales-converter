@@ -31,6 +31,7 @@ This version includes three conversion modes:
 - Provides a single action to download every successfully completed result in a batch.
 - Presents the local-processing privacy message and mascot as part of the main content instead of leaving them detached below the converter.
 - Includes a floating reset button that clears files, results, trim values, and saved preferences without reloading the page.
+- Includes an optional GitHub Sponsors link inside the privacy card to support continued development.
 - Lets users choose `128k`, `192k`, or `320k` bitrate.
 - Displays per-file and overall progress, individual download links, and before/after file sizes.
 - Modern responsive English interface.

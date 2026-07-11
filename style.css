@@ -216,6 +216,7 @@ h1 {
 
 .privacy-note {
   grid-column: 1 / -1;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -223,7 +224,21 @@ h1 {
   border-radius: 8px;
   background: rgba(145, 48, 209, 0.14);
   color: #f2e7ff;
-  padding: 14px 16px;
+  margin-top: 72px;
+  padding: 14px 16px 14px 158px;
+  overflow: visible;
+}
+
+.privacy-mascot {
+  position: absolute;
+  left: 22px;
+  bottom: calc(100% - 11px);
+  z-index: 2;
+  width: clamp(96px, 13vw, 148px);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.44));
 }
 
 .privacy-note span {
@@ -694,9 +709,21 @@ legend {
     display: grid;
   }
 
-.primary-button,
-.download-button,
-.open-button {
-  width: 100%;
-}
+  .privacy-note {
+    margin-top: 58px;
+    padding: 52px 14px 14px;
+  }
+
+  .privacy-mascot {
+    left: 18px;
+    bottom: calc(100% - 44px);
+    width: 108px;
+    transform: none;
+  }
+
+  .primary-button,
+  .download-button,
+  .open-button {
+    width: 100%;
+  }
 }

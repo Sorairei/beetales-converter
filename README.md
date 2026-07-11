@@ -16,8 +16,9 @@ This version includes two conversion modes:
 - Local browser-based conversion, with no server uploads.
 - Supports audio output as `mp3`, `wav`, and `aac`.
 - Supports WebM to MP4 video conversion.
+- Supports selecting, reviewing, and converting multiple files in one queue.
 - Lets users choose `128k`, `192k`, or `320k` bitrate.
-- Displays file name, file size, conversion status, and download link.
+- Displays per-file and overall progress, individual download links, and before/after file sizes.
 - Modern responsive English interface.
 - Releases the ffmpeg.wasm worker after each conversion to reduce memory usage.
 - Includes ffmpeg.wasm as local static files in `vendor/ffmpeg`.
@@ -45,14 +46,13 @@ Converter/
 
 The app runs fully in the browser:
 
-1. The user selects a local video file.
-2. JavaScript validates the selected file based on the active conversion mode.
+1. The user selects or drops one or more local video files.
+2. JavaScript validates the files and builds a removable conversion queue.
 3. ffmpeg.wasm is loaded from the local `vendor/ffmpeg` folder.
-4. The selected file is written to ffmpeg's in-browser virtual filesystem.
-5. ffmpeg converts the file locally.
-6. The generated output is converted into a browser `Blob`.
-7. The download button points to a temporary local object URL.
-8. Temporary ffmpeg files and worker memory are released after conversion.
+4. Each selected file is written to ffmpeg's in-browser virtual filesystem and converted sequentially.
+5. Each output is converted into a browser `Blob` with its own download link.
+6. The interface compares the original and converted file sizes.
+7. Temporary ffmpeg files are removed after every item and worker memory is released after the queue finishes.
 
 No files are uploaded to any server.
 

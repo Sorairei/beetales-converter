@@ -82,18 +82,20 @@
           </fieldset>
 
           <label class="drop-zone" for="video-file" id="drop-zone">
-            <input id="video-file" name="video-file" type="file" accept="video/*,.webm" />
+            <input id="video-file" name="video-file" type="file" accept="video/*,.webm" multiple />
             <span class="drop-icon" aria-hidden="true"></span>
-            <span class="drop-title" id="drop-title">Select a video file</span>
-            <span class="drop-hint" id="drop-hint">You can also drag and drop it here</span>
+            <span class="drop-title" id="drop-title">Select one or more video files</span>
+            <span class="drop-hint" id="drop-hint">You can also drag and drop them here</span>
           </label>
 
           <div class="file-card is-hidden" id="file-card" aria-live="polite">
-            <div>
-              <p class="file-label">Selected file</p>
+            <div class="file-summary">
+              <p class="file-label">Conversion queue</p>
               <p class="file-name" id="file-name"></p>
+              <p class="file-size" id="file-size"></p>
             </div>
-            <p class="file-size" id="file-size"></p>
+            <button class="clear-button" id="clear-files" type="button">Clear</button>
+            <ol class="file-list" id="file-list"></ol>
           </div>
 
           <div class="settings-grid" id="audio-settings">
@@ -142,13 +144,18 @@
             <button class="primary-button" id="convert-button" type="submit">
               Convert to audio
             </button>
-            <a class="download-button is-hidden" id="download-link" href="#" download>
-              Download file
-            </a>
-            <a class="open-button is-hidden" id="open-link" href="#" target="_blank" rel="noopener">
-              Open converted file
-            </a>
           </div>
+
+          <section class="results-panel is-hidden" id="results-panel" aria-live="polite">
+            <div class="results-heading">
+              <div>
+                <p class="file-label">Completed files</p>
+                <h2>Ready to download</h2>
+              </div>
+              <span id="results-summary"></span>
+            </div>
+            <div class="results-list" id="results-list"></div>
+          </section>
 
           <div class="status-area" aria-live="polite">
             <div class="progress-track" aria-hidden="true">
@@ -161,6 +168,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=20260711-download-fallback"></script>
+    <script type="module" src="app.js?v=20260711-batch-queue"></script>
   </body>
 </html>

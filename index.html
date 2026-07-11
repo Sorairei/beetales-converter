@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BeeTales Video to Audio Converter</title>
+    <title>BeeTales Media Converter</title>
     <meta
       name="description"
-      content="Convert video files to audio locally in your browser with ffmpeg.wasm."
+      content="Convert video files locally in your browser with ffmpeg.wasm. Extract audio or convert WebM to MP4 without uploading files."
     />
     <meta name="theme-color" content="#080b12" />
     <link rel="stylesheet" href="style.css" />
@@ -32,17 +32,18 @@
             />
             <figcaption class="brand-caption">
               <span>BeeTales</span>
-              <h1 id="app-title">Video to Audio Converter</h1>
+              <h1 id="app-title">Media Converter</h1>
             </figcaption>
           </figure>
 
           <p class="lead">
-            Extract audio from your videos as MP3, WAV, or AAC directly in your browser.
+            Extract audio from video files or convert WebM videos to MP4 directly in your browser.
           </p>
-          <div class="format-strip" aria-label="Available formats">
+          <div class="format-strip" aria-label="Available conversion options">
             <span>MP3</span>
             <span>WAV</span>
             <span>AAC</span>
+            <span>MP4</span>
           </div>
         </div>
 
@@ -52,11 +53,31 @@
         </div>
 
         <form class="converter-panel" id="converter-form">
+          <fieldset class="mode-fieldset">
+            <legend>Conversion mode</legend>
+            <div class="mode-control">
+              <label>
+                <input type="radio" name="mode" value="audio" checked />
+                <span>
+                  <strong>Extract audio</strong>
+                  <small>Video to MP3, WAV, or AAC</small>
+                </span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="mp4" />
+                <span>
+                  <strong>WebM to MP4</strong>
+                  <small>Convert WebM videos for upload compatibility</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
           <label class="drop-zone" for="video-file" id="drop-zone">
-            <input id="video-file" name="video-file" type="file" accept="video/*" />
+            <input id="video-file" name="video-file" type="file" accept="video/*,.webm" />
             <span class="drop-icon" aria-hidden="true"></span>
-            <span class="drop-title">Select a video file</span>
-            <span class="drop-hint">You can also drag and drop it here</span>
+            <span class="drop-title" id="drop-title">Select a video file</span>
+            <span class="drop-hint" id="drop-hint">You can also drag and drop it here</span>
           </label>
 
           <div class="file-card is-hidden" id="file-card" aria-live="polite">
@@ -67,7 +88,7 @@
             <p class="file-size" id="file-size"></p>
           </div>
 
-          <div class="settings-grid">
+          <div class="settings-grid" id="audio-settings">
             <fieldset>
               <legend>Output format</legend>
               <div class="segmented-control">
@@ -105,12 +126,19 @@
             </fieldset>
           </div>
 
+          <div class="mp4-note is-hidden" id="mp4-note">
+            MP4 conversion uses local ffmpeg.wasm and may take longer than audio extraction.
+          </div>
+
           <div class="actions">
             <button class="primary-button" id="convert-button" type="submit">
               Convert to audio
             </button>
             <a class="download-button is-hidden" id="download-link" href="#" download>
-              Download audio
+              Download file
+            </a>
+            <a class="open-button is-hidden" id="open-link" href="#" target="_blank" rel="noopener">
+              Open converted file
             </a>
           </div>
 
@@ -125,6 +153,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=20260703-local-ffmpeg"></script>
+    <script type="module" src="app.js?v=20260711-download-fallback"></script>
   </body>
 </html>

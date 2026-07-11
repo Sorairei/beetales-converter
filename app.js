@@ -4,14 +4,20 @@ import { fetchFile } from "./vendor/ffmpeg/util/index.js";
 const form = document.querySelector("#converter-form");
 const fileInput = document.querySelector("#video-file");
 const dropZone = document.querySelector("#drop-zone");
+const dropTitle = document.querySelector("#drop-title");
+const dropHint = document.querySelector("#drop-hint");
 const fileCard = document.querySelector("#file-card");
 const fileName = document.querySelector("#file-name");
 const fileSize = document.querySelector("#file-size");
 const convertButton = document.querySelector("#convert-button");
 const downloadLink = document.querySelector("#download-link");
+const openLink = document.querySelector("#open-link");
 const progressBar = document.querySelector("#progress-bar");
 const statusMessage = document.querySelector("#status-message");
 const errorMessage = document.querySelector("#error-message");
+const audioSettings = document.querySelector("#audio-settings");
+const mp4Note = document.querySelector("#mp4-note");
+const modeInputs = document.querySelectorAll('input[name="mode"]');
 
 const ffmpeg = new FFmpeg();
 let ffmpegReady = false;
@@ -27,12 +33,36 @@ const outputMimeTypes = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   aac: "audio/aac",
+  mp4: "video/mp4",
 };
 
-const outputArgs = {
+const audioOutputArgs = {
   mp3: ["-vn", "-map", "0:a:0", "-codec:a", "libmp3lame", "-f", "mp3"],
   wav: ["-vn", "-map", "0:a:0", "-codec:a", "pcm_s16le", "-f", "wav"],
   aac: ["-vn", "-map", "0:a:0", "-codec:a", "aac", "-f", "adts"],
+};
+
+const modeContent = {
+  audio: {
+    button: "Convert to audio",
+    busy: "Extracting audio...",
+    ready: "Video ready for audio extraction.",
+    empty: "Choose a video to get started.",
+    dropTitle: "Select a video file",
+    dropHint: "You can also drag and drop it here",
+    accept: "video/*,.webm",
+    download: "Download audio",
+  },
+  mp4: {
+    button: "Convert WebM to MP4",
+    busy: "Converting to MP4...",
+    ready: "WebM video ready for MP4 conversion.",
+    empty: "Choose a WebM video to get started.",
+    dropTitle: "Select a WebM video",
+    dropHint: "Drop a .webm file here or choose one from your device",
+    accept: "video/webm,.webm",
+    download: "Download MP4",
+  },
 };
 
 ffmpeg.on("progress", ({ progress }) => {
@@ -45,6 +75,12 @@ ffmpeg.on("progress", ({ progress }) => {
 
 fileInput.addEventListener("change", () => {
   handleFile(fileInput.files?.[0]);
+});
+
+modeInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    updateModeUI({ resetFile: true });
+  });
 });
 
 dropZone.addEventListener("dragover", (event) => {
@@ -67,9 +103,20 @@ form.addEventListener("submit", async (event) => {
   await convertSelectedVideo();
 });
 
+downloadLink.addEventListener("click", (event) => {
+  if (!audioUrl || !downloadLink.download) return;
+
+  event.preventDefault();
+  forceDownload(audioUrl, downloadLink.download);
+  setStatus(`Download started for ${downloadLink.download}. If it does not appear, use Open converted file.`);
+});
+
 window.addEventListener("beforeunload", resetDownload);
+updateModeUI({ resetFile: false });
 
 function handleFile(file) {
+  const mode = getMode();
+
   clearError();
   resetDownload();
   setProgress(0);
@@ -77,16 +124,16 @@ function handleFile(file) {
   if (!file) {
     selectedFile = null;
     fileCard.classList.add("is-hidden");
-    setStatus("Choose a video to get started.");
+    setStatus(modeContent[mode].empty);
     return;
   }
 
-  if (!isVideoFile(file)) {
+  if (!isValidFileForMode(file, mode)) {
     selectedFile = null;
     fileInput.value = "";
     fileCard.classList.add("is-hidden");
-    showError("The selected file does not appear to be a video. Try MP4, MOV, WebM, or a similar format.");
-    setStatus("Select a valid video file.");
+    showError(getValidationMessage(mode));
+    setStatus(mode === "mp4" ? "Select a valid WebM video file." : "Select a valid video file.");
     return;
   }
 
@@ -94,23 +141,28 @@ function handleFile(file) {
   fileName.textContent = file.name;
   fileSize.textContent = formatBytes(file.size);
   fileCard.classList.remove("is-hidden");
-  setStatus("Video ready to convert.");
+  setStatus(modeContent[mode].ready);
 }
 
 async function convertSelectedVideo() {
+  const mode = getMode();
+
   clearError();
   resetDownload();
   setProgress(0);
 
   if (!selectedFile) {
-    showError("Please select a video file first.");
+    showError(mode === "mp4" ? "Please select a WebM video file first." : "Please select a video file first.");
     return;
   }
 
-  const format = getCheckedValue("format");
-  const bitrate = getCheckedValue("bitrate");
+  if (!isValidFileForMode(selectedFile, mode)) {
+    showError(getValidationMessage(mode));
+    return;
+  }
+
   const inputName = `input-${Date.now()}.${getFileExtension(selectedFile.name) || "video"}`;
-  const outputName = `${safeBaseName(selectedFile.name)}.${format}`;
+  const outputName = getOutputName(selectedFile.name, mode);
   let wroteInput = false;
   let wroteOutput = false;
 
@@ -122,18 +174,14 @@ async function convertSelectedVideo() {
     await ffmpeg.writeFile(inputName, await fetchFile(selectedFile));
     wroteInput = true;
 
-    const args = [
-      "-hide_banner",
-      "-y",
-      "-i",
-      inputName,
-      ...outputArgs[format],
-      ...(format === "wav" ? [] : ["-b:a", bitrate]),
-      outputName,
-    ];
+    const args = mode === "mp4" ? getMp4Args(inputName, outputName, "h264") : getAudioArgs(inputName, outputName);
 
-    setStatus("Extracting audio...");
-    const exitCode = await ffmpeg.exec(args);
+    setStatus(mode === "mp4" ? "Converting WebM to MP4..." : "Extracting audio...");
+    let exitCode = await ffmpeg.exec(args);
+    if (mode === "mp4" && exitCode !== 0) {
+      setStatus("Retrying MP4 conversion with a compatibility encoder...");
+      exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4"));
+    }
     if (exitCode !== 0) {
       throw new Error(`ffmpeg-exit-${exitCode}`);
     }
@@ -144,17 +192,20 @@ async function convertSelectedVideo() {
       throw new Error("empty-output");
     }
 
-    const blob = new Blob([data], { type: outputMimeTypes[format] });
+    const blob = new Blob([data], { type: outputMimeTypes[getOutputExtension(mode)] });
     audioUrl = URL.createObjectURL(blob);
 
     downloadLink.href = audioUrl;
     downloadLink.download = outputName;
+    downloadLink.textContent = modeContent[mode].download;
     downloadLink.classList.remove("is-hidden");
+    openLink.href = audioUrl;
+    openLink.classList.remove("is-hidden");
     setProgress(100);
     setStatus(`Conversion complete. Your file is ready: ${outputName}`);
   } catch (error) {
     console.error(error);
-    showError(getFriendlyError(error));
+    showError(getFriendlyError(error, mode));
     setStatus("The conversion stopped.");
   } finally {
     await cleanupFiles(
@@ -164,6 +215,51 @@ async function convertSelectedVideo() {
     releaseFfmpegMemory();
     setBusy(false);
   }
+}
+
+function getAudioArgs(inputName, outputName) {
+  const format = getCheckedValue("format");
+  const bitrate = getCheckedValue("bitrate");
+
+  return [
+    "-hide_banner",
+    "-y",
+    "-i",
+    inputName,
+    ...audioOutputArgs[format],
+    ...(format === "wav" ? [] : ["-b:a", bitrate]),
+    outputName,
+  ];
+}
+
+function getMp4Args(inputName, outputName, encoder) {
+  const videoCodecArgs =
+    encoder === "mpeg4"
+      ? ["-c:v", "mpeg4", "-q:v", "5"]
+      : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"];
+
+  return [
+    "-hide_banner",
+    "-y",
+    "-i",
+    inputName,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    ...videoCodecArgs,
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "160k",
+    "-movflags",
+    "+faststart",
+    "-f",
+    "mp4",
+    outputName,
+  ];
 }
 
 async function loadFfmpeg() {
@@ -248,12 +344,54 @@ function resetDownload() {
   downloadLink.removeAttribute("href");
   downloadLink.removeAttribute("download");
   downloadLink.classList.add("is-hidden");
+  openLink.removeAttribute("href");
+  openLink.classList.add("is-hidden");
+}
+
+function forceDownload(url, filename) {
+  const temporaryLink = document.createElement("a");
+  temporaryLink.href = url;
+  temporaryLink.download = filename;
+  temporaryLink.rel = "noopener";
+  temporaryLink.style.display = "none";
+  document.body.appendChild(temporaryLink);
+  temporaryLink.click();
+  temporaryLink.remove();
+}
+
+function updateModeUI({ resetFile }) {
+  const mode = getMode();
+  const isMp4Mode = mode === "mp4";
+
+  audioSettings.classList.toggle("is-hidden", isMp4Mode);
+  mp4Note.classList.toggle("is-hidden", !isMp4Mode);
+  fileInput.accept = modeContent[mode].accept;
+  dropTitle.textContent = modeContent[mode].dropTitle;
+  dropHint.textContent = modeContent[mode].dropHint;
+  downloadLink.textContent = modeContent[mode].download;
+
+  if (resetFile) {
+    selectedFile = null;
+    fileInput.value = "";
+    fileCard.classList.add("is-hidden");
+    resetDownload();
+    clearError();
+    setProgress(0);
+  }
+
+  setBusy(false);
+  setStatus(modeContent[mode].empty);
 }
 
 function setBusy(isBusy) {
+  const mode = getMode();
+
   convertButton.disabled = isBusy;
   fileInput.disabled = isBusy;
-  convertButton.textContent = isBusy ? "Processing..." : "Convert to audio";
+  modeInputs.forEach((input) => {
+    input.disabled = isBusy;
+  });
+  convertButton.textContent = isBusy ? "Processing..." : modeContent[mode].button;
 }
 
 function setProgress(percent) {
@@ -274,7 +412,7 @@ function clearError() {
   errorMessage.classList.add("is-hidden");
 }
 
-function getFriendlyError(error) {
+function getFriendlyError(error, mode) {
   const message = String(error?.message || error || "").toLowerCase();
 
   if (message.includes("worker") || message.includes("securityerror")) {
@@ -289,27 +427,57 @@ function getFriendlyError(error) {
     return "The browser ran out of memory while processing this video. Try a smaller file or close other tabs before converting.";
   }
 
+  if (mode === "mp4" && message.includes("unknown encoder")) {
+    return "This ffmpeg.wasm build cannot encode MP4 video with the required codec. Use a WebM file with a smaller resolution or try audio extraction instead.";
+  }
+
   if (message.includes("audio") || message.includes("stream") || message.includes("map")) {
-    return "No compatible audio track was found in this video. Try another file or a different output format.";
+    return mode === "mp4"
+      ? "The WebM file could not be mapped into an MP4 output. Try another WebM file."
+      : "No compatible audio track was found in this video. Try another file or a different output format.";
   }
 
   if (message.includes("ffmpeg-exit")) {
-    return "ffmpeg could not extract audio from this video. Make sure the file contains audio and try another output format.";
+    return mode === "mp4"
+      ? "ffmpeg could not convert this WebM file to MP4. Try a smaller WebM file or a different source."
+      : "ffmpeg could not extract audio from this video. Make sure the file contains audio and try another output format.";
   }
 
   if (message.includes("network") || message.includes("fetch")) {
-    return "ffmpeg.wasm could not be loaded. Check your connection and try again.";
+    return "ffmpeg.wasm could not be loaded. Check that the local vendor files are available and try again.";
   }
 
   if (message.includes("empty-output")) {
-    return "The conversion finished without generating audio. Try another output format.";
+    return "The conversion finished without generating a file. Try another output format or source file.";
   }
 
-  return "We could not convert this video. Try another output format or a different video file.";
+  return mode === "mp4"
+    ? "We could not convert this WebM video to MP4. Try a smaller or different WebM file."
+    : "We could not convert this video. Try another output format or a different video file.";
+}
+
+function getValidationMessage(mode) {
+  if (mode === "mp4") {
+    return "Please select a WebM video file. This mode is specifically for converting .webm files to MP4.";
+  }
+
+  return "The selected file does not appear to be a video. Try MP4, MOV, WebM, or a similar format.";
 }
 
 function getCheckedValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
+}
+
+function getMode() {
+  return getCheckedValue("mode");
+}
+
+function isValidFileForMode(file, mode) {
+  if (mode === "mp4") {
+    return isWebmFile(file);
+  }
+
+  return isVideoFile(file);
 }
 
 function isVideoFile(file) {
@@ -317,6 +485,19 @@ function isVideoFile(file) {
 
   const videoExtensions = ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"];
   return videoExtensions.includes(getFileExtension(file.name));
+}
+
+function isWebmFile(file) {
+  return file.type === "video/webm" || getFileExtension(file.name) === "webm";
+}
+
+function getOutputName(name, mode) {
+  const extension = getOutputExtension(mode);
+  return `${safeBaseName(name)}.${extension}`;
+}
+
+function getOutputExtension(mode) {
+  return mode === "mp4" ? "mp4" : getCheckedValue("format");
 }
 
 function formatBytes(bytes) {
@@ -333,7 +514,7 @@ function getFileExtension(name) {
 }
 
 function getBaseName(name) {
-  return name.replace(/\.[^/.]+$/, "") || "converted-audio";
+  return name.replace(/\.[^/.]+$/, "") || "converted-media";
 }
 
 function safeBaseName(name) {
@@ -343,7 +524,7 @@ function safeBaseName(name) {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9._-]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "converted-audio"
+      .slice(0, 80) || "converted-media"
   );
 }
 

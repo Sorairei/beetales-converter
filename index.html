@@ -37,27 +37,33 @@
           </figure>
 
           <p class="lead">
-            Extract audio, convert WebM, or resize, trim, and optimize MP4 directly in your browser.
+            Extract audio, optimize MP4, or turn a video clip into GIF directly in your browser.
           </p>
           <div class="format-strip" aria-label="Available conversion options">
             <span>MP3</span>
             <span>WAV</span>
             <span>AAC</span>
             <span>MP4</span>
+            <span>GIF</span>
           </div>
-        </div>
-
-        <div class="privacy-note" role="note">
-          <img
-            class="privacy-mascot"
-            src="raccoon.png"
-            alt=""
-            width="1024"
-            height="1024"
-            aria-hidden="true"
-          />
-          <span aria-hidden="true"></span>
-          <p>Your files are never uploaded to a server. Everything is processed locally in your browser.</p>
+          <div class="privacy-note" role="note">
+            <img
+              class="privacy-mascot"
+              src="raccoon.png"
+              alt="BeeTales privacy mascot"
+              width="1024"
+              height="1024"
+            />
+            <div>
+              <strong>Private by design</strong>
+              <p>Your files never leave this device. No uploads, accounts, or conversion server.</p>
+              <ul aria-label="Privacy benefits">
+                <li>100% local</li>
+                <li>No registration</li>
+                <li>Browser only</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <form class="converter-panel" id="converter-form">
@@ -76,6 +82,13 @@
                 <span>
                   <strong>Convert or optimize MP4</strong>
                   <small>WebM/MP4 to resized, trimmed, or compressed MP4</small>
+                </span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="gif" />
+                <span>
+                  <strong>Video to GIF</strong>
+                  <small>Create a short animated GIF from a video clip</small>
                 </span>
               </label>
             </div>
@@ -186,6 +199,29 @@
             MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
           </div>
 
+          <div class="settings-grid gif-settings is-hidden" id="gif-settings">
+            <fieldset>
+              <legend>GIF size</legend>
+              <select class="setting-select" id="gif-width" name="gif-width">
+                <option value="320">Small · 320 px</option>
+                <option value="480" selected>Balanced · 480 px</option>
+                <option value="640">Large · 640 px</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Frame rate</legend>
+              <select class="setting-select" id="gif-fps" name="gif-fps">
+                <option value="8">8 FPS · smaller</option>
+                <option value="12" selected>12 FPS · balanced</option>
+                <option value="15">15 FPS · smoother</option>
+              </select>
+            </fieldset>
+          </div>
+
+          <div class="gif-note is-hidden" id="gif-note">
+            GIF clips are limited to 15 seconds to protect browser memory. Use Trim to choose the best moment.
+          </div>
+
           <div class="actions">
             <button class="primary-button" id="convert-button" type="submit">
               Convert to audio
@@ -220,6 +256,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=20260711-saved-settings"></script>
+    <script type="module" src="app.js?v=20260711-video-gif"></script>
   </body>
 </html>

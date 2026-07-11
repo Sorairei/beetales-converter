@@ -4,12 +4,13 @@ A static web app for converting media files directly in the browser with ffmpeg.
 
 ## Current Version
 
-This version includes two conversion modes:
+This version includes three conversion modes:
 
 | Mode | Input | Output | Purpose |
 | --- | --- | --- | --- |
 | Extract audio | Video files such as MP4, MOV, MKV, WebM | MP3, WAV, AAC | Create audio files from video sources |
 | Convert or optimize MP4 | `.webm` and `.mp4` video files | MP4 | Convert WebM or resize, trim, and recompress existing MP4 videos |
+| Video to GIF | Compatible video files | Animated GIF | Create a short shareable animation with size and frame-rate controls |
 
 ## Features
 
@@ -17,6 +18,8 @@ This version includes two conversion modes:
 - Supports audio output as `mp3`, `wav`, and `aac`.
 - Supports WebM to MP4 video conversion.
 - Supports MP4-to-MP4 optimization with trimming, resolution, and quality controls.
+- Creates animated GIF clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS.
+- Limits GIF clips to 15 seconds to protect browser memory.
 - Supports selecting, reviewing, and converting multiple files in one queue.
 - Supports optional time-based trimming with `MM:SS` or `HH:MM:SS` start and end values.
 - Provides smaller, balanced, and high-quality MP4 presets plus original, 1080p, 720p, and 480p resolution choices.
@@ -26,6 +29,7 @@ This version includes two conversion modes:
 - Lets users safely cancel an active conversion while keeping completed results available.
 - Remembers the last mode, output format, bitrate, quality, and resolution locally in the browser.
 - Provides a single action to download every successfully completed result in a batch.
+- Presents the local-processing privacy message and mascot as part of the main content instead of leaving them detached below the converter.
 - Lets users choose `128k`, `192k`, or `320k` bitrate.
 - Displays per-file and overall progress, individual download links, and before/after file sizes.
 - Modern responsive English interface.

@@ -24,8 +24,12 @@ const errorMessage = $("#error-message");
 const audioSettings = $("#audio-settings");
 const mp4Settings = $("#mp4-settings");
 const mp4Note = $("#mp4-note");
+const gifSettings = $("#gif-settings");
+const gifNote = $("#gif-note");
 const videoQuality = $("#video-quality");
 const videoResolution = $("#video-resolution");
+const gifWidth = $("#gif-width");
+const gifFps = $("#gif-fps");
 const trimStart = $("#trim-start");
 const trimEnd = $("#trim-end");
 const resultsPanel = $("#results-panel");
@@ -33,7 +37,7 @@ const resultsList = $("#results-list");
 const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution, #gif-width, #gif-fps');
 
 const ffmpeg = new FFmpeg();
 let ffmpegReady = false;
@@ -51,7 +55,7 @@ const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
 const ffmpegWasmURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.wasm");
-const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4" };
+const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4", gif: "image/gif" };
 const audioOutputArgs = {
   mp3: ["-vn", "-map", "0:a:0", "-codec:a", "libmp3lame", "-f", "mp3"],
   wav: ["-vn", "-map", "0:a:0", "-codec:a", "pcm_s16le", "-f", "wav"],
@@ -67,6 +71,11 @@ const modeContent = {
     button: "Convert queue to MP4", busy: "Converting to MP4...", ready: "video(s) ready for MP4 conversion or optimization.",
     empty: "Choose one or more WebM or MP4 videos to get started.", dropTitle: "Select WebM or MP4 videos",
     dropHint: "Drop .webm or .mp4 files here or choose them from your device", accept: "video/webm,video/mp4,.webm,.mp4", download: "Download MP4",
+  },
+  gif: {
+    button: "Convert queue to GIF", busy: "Creating GIF...", ready: "video(s) ready for GIF creation.",
+    empty: "Choose one or more videos to create GIF clips.", dropTitle: "Select videos for GIF",
+    dropHint: "Choose a short clip with Trim for the best result", accept: "video/*,.webm,.mp4", download: "Download GIF",
   },
 };
 
@@ -190,6 +199,12 @@ async function convertQueue() {
     trimEnd.focus();
     return;
   }
+  const gifDurationError = getGifDurationError(trim);
+  if (gifDurationError) {
+    showError(gifDurationError);
+    trimEnd.focus();
+    return;
+  }
 
   const results = [];
   try {
@@ -308,7 +323,8 @@ async function convertFile(file, mode, index, trim) {
   try {
     await ffmpeg.writeFile(inputName, await fetchFile(file));
     wroteInput = true;
-    let exitCode = await ffmpeg.exec(mode === "mp4" ? getMp4Args(inputName, outputName, "h264", trim) : getAudioArgs(inputName, outputName, trim));
+    const initialArgs = mode === "mp4" ? getMp4Args(inputName, outputName, "h264", trim) : mode === "gif" ? getGifArgs(inputName, outputName, trim) : getAudioArgs(inputName, outputName, trim);
+    let exitCode = await ffmpeg.exec(initialArgs);
     if (mode === "mp4" && exitCode !== 0) exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4", trim));
     if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
     wroteOutput = true;
@@ -374,6 +390,11 @@ function getMp4Args(inputName, outputName, encoder, trim) {
   return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, ...scaleArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
 }
 
+function getGifArgs(inputName, outputName, trim) {
+  const filter = `[0:v]fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=sierra2_4a`;
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", filter, "-loop", "0", "-f", "gif", outputName];
+}
+
 function getTrimSettings() {
   const start = parseTimeValue(trimStart.value);
   const end = parseTimeValue(trimEnd.value);
@@ -398,6 +419,15 @@ function getTrimInputArgs(trim) {
 function getTrimDurationArgs(trim) {
   if (trim.end === undefined) return [];
   return ["-t", String(trim.end - (trim.start || 0))];
+}
+
+function getGifDurationError(trim) {
+  if (getMode() !== "gif") return "";
+  const durations = selectedFiles.map((file) => fileMetadata.get(file)?.duration).filter(Number.isFinite);
+  if (!durations.length) return "";
+  const start = trim.start || 0;
+  const requestedDuration = trim.end !== undefined ? trim.end - start : Math.max(...durations.map((duration) => duration - start));
+  return requestedDuration > 15 ? "GIF clips are limited to 15 seconds. Enter an End time no more than 15 seconds after Start time." : "";
 }
 
 async function loadFfmpeg() {
@@ -444,6 +474,8 @@ function savePreferences() {
     bitrate: getCheckedValue("bitrate"),
     quality: videoQuality.value,
     resolution: videoResolution.value,
+    gifWidth: gifWidth.value,
+    gifFps: gifFps.value,
   };
   try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
 }
@@ -457,6 +489,8 @@ function restorePreferences() {
     setCheckedValue("bitrate", preferences.bitrate);
     setSelectValue(videoQuality, preferences.quality);
     setSelectValue(videoResolution, preferences.resolution);
+    setSelectValue(gifWidth, preferences.gifWidth);
+    setSelectValue(gifFps, preferences.gifFps);
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
@@ -478,9 +512,12 @@ function forceDownload(url, filename) {
 function updateModeUI({ resetFiles }) {
   const mode = getMode();
   const isMp4 = mode === "mp4";
-  audioSettings.classList.toggle("is-hidden", isMp4);
+  const isGif = mode === "gif";
+  audioSettings.classList.toggle("is-hidden", mode !== "audio");
   mp4Settings.classList.toggle("is-hidden", !isMp4);
   mp4Note.classList.toggle("is-hidden", !isMp4);
+  gifSettings.classList.toggle("is-hidden", !isGif);
+  gifNote.classList.toggle("is-hidden", !isGif);
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
   dropHint.textContent = modeContent[mode].dropHint;
@@ -495,6 +532,8 @@ function setBusy(busy) {
   clearFilesButton.disabled = busy;
   videoQuality.disabled = busy;
   videoResolution.disabled = busy;
+  gifWidth.disabled = busy;
+  gifFps.disabled = busy;
   trimStart.disabled = busy;
   trimEnd.disabled = busy;
   cancelButton.classList.toggle("is-hidden", !busy);
@@ -509,6 +548,7 @@ function getFriendlyError(error, mode) {
   if (message.includes("timeout") || message.includes("abort")) return "The conversion engine took too long to load. Refresh and try again.";
   if (message.includes("memory")) return "The browser ran out of memory. Try fewer or smaller files.";
   if (message.includes("empty-output")) return "No output file was generated.";
+  if (mode === "gif") return "This video could not be converted to GIF. Try a shorter clip or smaller GIF size.";
   if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "No compatible audio track was found.";
   return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "This video could not be converted.";
 }
@@ -520,8 +560,8 @@ function isValidFileForMode(file, mode) { return mode === "mp4" ? isMp4SourceFil
 function isVideoFile(file) { return file.type.startsWith("video/") || ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"].includes(getFileExtension(file.name)); }
 function isWebmFile(file) { return file.type === "video/webm" || getFileExtension(file.name) === "webm"; }
 function isMp4SourceFile(file) { return isWebmFile(file) || file.type === "video/mp4" || getFileExtension(file.name) === "mp4"; }
-function getOutputName(name, mode) { const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : ""; return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`; }
-function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : getCheckedValue("format"); }
+function getOutputName(name, mode) { const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : mode === "gif" ? "-clip" : ""; return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`; }
+function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : mode === "gif" ? "gif" : getCheckedValue("format"); }
 function getSizeComparison(input, output) {
   const difference = input ? Math.round((1 - output / input) * 100) : 0;
   const change = difference >= 0 ? `${difference}% smaller` : `${Math.abs(difference)}% larger`;

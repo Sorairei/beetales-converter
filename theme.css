@@ -1,0 +1,392 @@
+:root {
+  color-scheme: dark;
+  --bg: #050b07;
+  --panel: #0a150d;
+  --panel-soft: #102317;
+  --panel-strong: #07110b;
+  --text: #c7d7a0;
+  --text-strong: #d0dfa7;
+  --muted: #8fa57a;
+  --line: #29402c;
+  --line-strong: #39563a;
+  --accent: #6e8f4a;
+  --accent-strong: #91bd59;
+  --accent-soft: #4d6e38;
+  --accent-ink: #07100b;
+  --amber: #c58a35;
+  --amber-strong: #e1a94d;
+  --blue: #c58a35;
+  --danger: #ff7b66;
+  --success: #91bd59;
+  --shadow: 0 28px 80px rgba(0, 8, 3, 0.55);
+}
+
+html {
+  background: #020604;
+}
+
+body {
+  isolation: isolate;
+  background-color: #020604;
+  background-image:
+    linear-gradient(90deg, rgba(2, 6, 4, 0.78) 0%, rgba(2, 6, 4, 0.58) 48%, rgba(2, 6, 4, 0.38) 100%),
+    linear-gradient(180deg, rgba(2, 6, 4, 0.14), rgba(2, 6, 4, 0.48)),
+    url("assets/swamp-space.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  mix-blend-mode: screen;
+  background-image:
+    radial-gradient(circle, rgba(184, 255, 61, 0.85) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(145, 189, 89, 0.72) 0 1px, transparent 2.2px),
+    radial-gradient(circle, rgba(225, 169, 77, 0.65) 0 1px, transparent 2px);
+  background-size: 173px 191px, 257px 223px, 337px 281px;
+  background-position: 12px 18px, 83px 47px, 151px 101px;
+  animation: beetales-fireflies 24s linear infinite;
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes beetales-fireflies {
+  0% {
+    background-position: 12px 18px, 83px 47px, 151px 101px;
+    opacity: 0.2;
+  }
+  45% {
+    opacity: 0.32;
+  }
+  100% {
+    background-position: 58px -73px, 21px -82px, 206px -39px;
+    opacity: 0.22;
+  }
+}
+
+.brand-logo {
+  display: block;
+  width: min(100%, 390px);
+  height: auto;
+  filter: drop-shadow(0 14px 24px rgba(0, 4, 1, 0.5));
+}
+
+.product-heading {
+  margin-top: 28px;
+}
+
+.product-heading span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--amber-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.product-heading h1,
+legend,
+.results-heading h2,
+.preview-heading h2 {
+  color: var(--text-strong);
+}
+
+.lead,
+.drop-hint,
+.file-size,
+#status-message,
+.setting-help,
+.result-card span,
+.preview-heading > span {
+  color: var(--muted);
+}
+
+.format-strip span {
+  border-color: var(--line);
+  background: rgba(16, 35, 23, 0.68);
+  color: var(--text-strong);
+}
+
+.privacy-note {
+  border-color: rgba(110, 143, 74, 0.38);
+  background:
+    radial-gradient(circle at 9% 22%, rgba(144, 169, 110, 0.12), transparent 44%),
+    linear-gradient(135deg, rgba(16, 35, 23, 0.94), rgba(7, 17, 11, 0.97));
+  color: var(--text);
+  box-shadow: 0 18px 42px rgba(0, 7, 2, 0.32), inset 0 1px rgba(199, 215, 160, 0.04);
+}
+
+.privacy-mascot {
+  width: 118px;
+  filter: drop-shadow(0 14px 22px rgba(0, 6, 2, 0.5));
+}
+
+.privacy-note strong {
+  color: var(--text-strong);
+}
+
+.privacy-note p {
+  color: var(--muted);
+}
+
+.privacy-note li {
+  border-color: rgba(110, 143, 74, 0.28);
+  background: rgba(110, 143, 74, 0.1);
+  color: var(--text);
+}
+
+.sponsor-button {
+  color: #ffe2a5;
+  border-color: rgba(197, 138, 53, 0.46);
+  background: rgba(143, 113, 60, 0.1);
+}
+
+.sponsor-button span {
+  color: var(--amber-strong);
+}
+
+.sponsor-button:hover {
+  color: #fff0c7;
+  border-color: rgba(225, 169, 77, 0.72);
+  background: rgba(197, 138, 53, 0.17);
+}
+
+.converter-panel {
+  border-color: rgba(57, 86, 58, 0.68);
+  background: linear-gradient(180deg, rgba(199, 215, 160, 0.035), transparent 22%), var(--panel);
+  box-shadow: var(--shadow), inset 0 1px rgba(199, 215, 160, 0.04);
+}
+
+.drop-zone {
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, rgba(110, 143, 74, 0.075), transparent 48%), var(--panel-strong);
+}
+
+.drop-zone:hover,
+.drop-zone.is-dragging {
+  border-color: rgba(145, 189, 89, 0.52);
+  background: linear-gradient(180deg, rgba(110, 143, 74, 0.13), transparent 55%), var(--panel-strong);
+  box-shadow: 0 0 0 4px rgba(110, 143, 74, 0.12);
+}
+
+.drop-icon {
+  border-color: rgba(145, 189, 89, 0.58);
+  background: rgba(110, 143, 74, 0.14);
+  color: var(--accent-strong);
+}
+
+.drop-title,
+.file-name,
+.file-list strong,
+.result-card strong {
+  color: var(--text-strong);
+}
+
+.file-card,
+.preview-panel {
+  border-color: var(--line);
+  background: var(--panel-soft);
+}
+
+.file-label {
+  color: var(--accent-strong);
+}
+
+.file-list {
+  border-color: var(--line);
+}
+
+.file-list li {
+  background: rgba(199, 215, 160, 0.035);
+}
+
+.file-list em {
+  color: var(--amber-strong);
+}
+
+.clear-button,
+.file-list button {
+  color: var(--muted);
+}
+
+.setting-select,
+.time-grid input,
+.segmented-control,
+.mode-control span {
+  border-color: var(--line);
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.setting-select:focus,
+.time-grid input:focus {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(110, 143, 74, 0.14);
+}
+
+.time-grid label > span,
+.mode-control small,
+.segmented-control span {
+  color: var(--muted);
+}
+
+.mode-control strong {
+  color: var(--text-strong);
+}
+
+.mode-control span:hover,
+.segmented-control span:hover {
+  border-color: rgba(145, 189, 89, 0.46);
+  background: rgba(110, 143, 74, 0.07);
+  color: var(--text-strong);
+}
+
+.mode-control input:checked + span,
+.segmented-control input:checked + span {
+  color: var(--accent-ink);
+  border-color: rgba(145, 189, 89, 0.64);
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  box-shadow: 0 8px 24px rgba(42, 72, 38, 0.32);
+}
+
+.mode-control input:checked + span strong,
+.mode-control input:checked + span small {
+  color: var(--accent-ink);
+}
+
+.mp4-note,
+.gif-note {
+  border-color: rgba(110, 143, 74, 0.3);
+  background: rgba(110, 143, 74, 0.075);
+  color: var(--text);
+}
+
+.primary-button {
+  color: var(--accent-ink);
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  box-shadow: 0 16px 34px rgba(28, 57, 30, 0.38);
+}
+
+.primary-button:hover {
+  background: linear-gradient(180deg, #a8be82, #78964b);
+  box-shadow: 0 18px 38px rgba(35, 66, 35, 0.42);
+}
+
+.download-button,
+.open-button,
+.result-card a {
+  color: #1b1303;
+  background: linear-gradient(180deg, var(--amber-strong), var(--amber));
+}
+
+.download-button:hover,
+.open-button:hover,
+.result-card a:hover {
+  color: #1b1303;
+  background: linear-gradient(180deg, #efbd68, #ca913c);
+}
+
+.download-all-button {
+  color: #ffe2a5;
+  border-color: rgba(197, 138, 53, 0.42);
+  background: rgba(197, 138, 53, 0.1);
+}
+
+.download-all-button:hover {
+  background: rgba(197, 138, 53, 0.18);
+}
+
+.results-tools > span {
+  color: var(--success);
+}
+
+.result-card {
+  border-color: rgba(145, 189, 89, 0.22);
+  background: rgba(110, 143, 74, 0.06);
+}
+
+.progress-track {
+  border-color: rgba(199, 215, 160, 0.06);
+  background: #030805;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong), var(--amber));
+}
+
+.reset-floating-button {
+  border-color: rgba(110, 143, 74, 0.5);
+  background: rgba(7, 17, 11, 0.94);
+  color: var(--text-strong);
+  box-shadow: 0 14px 34px rgba(0, 8, 3, 0.48);
+}
+
+.reset-floating-button span {
+  color: var(--amber-strong);
+}
+
+.reset-floating-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(16, 35, 23, 0.98);
+}
+
+.site-footer {
+  border-color: rgba(57, 86, 58, 0.48);
+  color: #718466;
+}
+
+.site-footer a {
+  color: var(--muted);
+}
+
+.site-footer a:hover {
+  color: var(--text-strong);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(145, 189, 89, 0.42);
+  outline-offset: 3px;
+}
+
+@media (max-width: 700px) {
+  body {
+    background-position: 62% center;
+    background-attachment: scroll;
+  }
+
+  .brand-logo {
+    width: min(100%, 340px);
+  }
+
+  .privacy-mascot {
+    width: 82px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -39,16 +39,26 @@ This version includes three conversion modes:
 - Releases the ffmpeg.wasm worker after each conversion to reduce memory usage.
 - Includes ffmpeg.wasm as local static files in `vendor/ffmpeg`.
 
+## Visual Identity
+
+The interface uses the same nocturnal swamp identity as BeeTales PDF Tools: dark green panels, restrained moss accents, small amber details, a local swamp background, and subtle CSS fireflies. The visual theme is isolated in `theme.css`, while `style.css` retains the structural layout.
+
+All branding resources are bundled locally. The application does not request logos, backgrounds, fonts, or interface assets from a CDN or external website.
+
 ## Structure
 
 ```text
 Converter/
 |-- index.html
 |-- style.css
+|-- theme.css
 |-- app.js
+|-- favicon.ico
+|-- favicon.png
 |-- assets/
-|   |-- beetales-converter-hero.png
-|   `-- beetales-logo.png
+|   |-- beetales-logo-v2.png
+|   |-- sora-avatar.png
+|   `-- swamp-space.png
 |-- vendor/
 |   `-- ffmpeg/
 |       |-- core/
@@ -102,7 +112,10 @@ Recommended repository contents:
 ```text
 index.html
 style.css
+theme.css
 app.js
+favicon.ico
+favicon.png
 assets/
 vendor/
 README.md

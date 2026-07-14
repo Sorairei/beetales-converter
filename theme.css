@@ -83,7 +83,17 @@ body::before {
 }
 
 .product-heading {
-  margin-top: 28px;
+  position: absolute;
+  z-index: 2;
+  left: 24px;
+  top: 22px;
+  width: min(78%, 340px);
+  margin: 0;
+  padding: 18px 20px;
+  border-left: 2px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(90deg, rgba(2, 8, 4, 0.92), rgba(2, 8, 4, 0.62) 72%, transparent);
+  text-shadow: 0 3px 16px rgba(0, 5, 2, 0.92);
 }
 
 .product-heading span {
@@ -101,6 +111,27 @@ legend,
 .results-heading h2,
 .preview-heading h2 {
   color: var(--text-strong);
+}
+
+.swamp-hero {
+  width: min(100%, 520px);
+  margin-top: 24px;
+  border-color: rgba(57, 86, 58, 0.7);
+  background: var(--panel-strong);
+  box-shadow: 0 24px 70px rgba(0, 8, 3, 0.42), inset 0 1px rgba(199, 215, 160, 0.04);
+}
+
+.swamp-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(1, 6, 3, 0.14), transparent 42%, rgba(1, 6, 3, 0.2));
+  pointer-events: none;
+}
+
+.swamp-hero img {
+  aspect-ratio: 1717 / 916;
+  object-fit: cover;
 }
 
 .lead,
@@ -371,6 +402,17 @@ select:focus-visible {
 
   .brand-logo {
     width: min(100%, 340px);
+  }
+
+  .product-heading {
+    left: 14px;
+    top: 14px;
+    width: min(86%, 300px);
+    padding: 13px 15px;
+  }
+
+  .product-heading h1 {
+    font-size: clamp(1.6rem, 9vw, 2.4rem);
   }
 
   .privacy-mascot {

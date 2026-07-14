@@ -57,6 +57,7 @@ Converter/
 |-- favicon.png
 |-- assets/
 |   |-- beetales-logo-v2.png
+|   |-- beetales-converter-hero-swamp.png
 |   |-- sora-avatar.png
 |   `-- swamp-space.png
 |-- vendor/

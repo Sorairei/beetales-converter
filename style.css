@@ -372,7 +372,7 @@ h1 {
     box-shadow 180ms ease;
 }
 
-.drop-zone:hover,
+.drop-zone:not(.is-disabled):hover,
 .drop-zone.is-dragging {
   border-color: var(--accent);
   background:
@@ -380,6 +380,11 @@ h1 {
     var(--panel-strong);
   box-shadow: 0 0 0 4px rgba(145, 48, 209, 0.14);
   transform: translateY(-1px);
+}
+
+.drop-zone.is-disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .drop-zone input {

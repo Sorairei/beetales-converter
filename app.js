@@ -1,5 +1,14 @@
 import { FFmpeg } from "./vendor/ffmpeg/ffmpeg/index.js";
 import { fetchFile } from "./vendor/ffmpeg/util/index.js";
+import {
+  formatBytes,
+  formatDuration,
+  getFileExtension,
+  getTrimDurationArgs,
+  getTrimInputArgs,
+  parseTimeValue,
+  safeBaseName,
+} from "./converter-utils.js";
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#converter-form");
@@ -49,6 +58,7 @@ let activeFileIndex = 0;
 let previewUrl = null;
 let cancelRequested = false;
 let completedResults = [];
+let conversionInProgress = false;
 const fileMetadata = new Map();
 const fileStates = new Map();
 
@@ -91,11 +101,15 @@ ffmpeg.on("progress", ({ progress }) => {
 fileInput.addEventListener("change", () => handleFiles(fileInput.files));
 modeInputs.forEach((input) => input.addEventListener("change", () => updateModeUI({ resetFiles: true })));
 preferenceInputs.forEach((input) => input.addEventListener("change", savePreferences));
-dropZone.addEventListener("dragover", (event) => { event.preventDefault(); dropZone.classList.add("is-dragging"); });
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (!conversionInProgress) dropZone.classList.add("is-dragging");
+});
 dropZone.addEventListener("dragleave", () => dropZone.classList.remove("is-dragging"));
 dropZone.addEventListener("drop", (event) => {
   event.preventDefault();
   dropZone.classList.remove("is-dragging");
+  if (conversionInProgress) return;
   handleFiles(event.dataTransfer.files);
 });
 clearFilesButton.addEventListener("click", clearSelection);
@@ -108,6 +122,7 @@ restorePreferences();
 updateModeUI({ resetFiles: false });
 
 async function handleFiles(fileCollection) {
+  if (conversionInProgress) return;
   clearError();
   resetResults();
   setProgress(0);
@@ -154,6 +169,7 @@ function renderQueue() {
     details.append(name, size, state);
     remove.type = "button";
     remove.textContent = "Remove";
+    remove.disabled = conversionInProgress;
     remove.setAttribute("aria-label", `Remove ${file.name}`);
     remove.addEventListener("click", () => {
       selectedFiles.splice(index, 1);
@@ -405,24 +421,6 @@ function getTrimSettings() {
   return { start, end };
 }
 
-function parseTimeValue(value) {
-  const clean = value.trim();
-  if (!clean) return undefined;
-  const parts = clean.split(":");
-  if (parts.length < 1 || parts.length > 3 || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part))) return null;
-  if (parts.length > 1 && parts.slice(1).some((part) => Number(part) >= 60)) return null;
-  return parts.reduce((seconds, part) => seconds * 60 + Number(part), 0);
-}
-
-function getTrimInputArgs(trim) {
-  return trim.start !== undefined ? ["-ss", String(trim.start)] : [];
-}
-
-function getTrimDurationArgs(trim) {
-  if (trim.end === undefined) return [];
-  return ["-t", String(trim.end - (trim.start || 0))];
-}
-
 function getGifDurationError(trim) {
   if (getMode() !== "gif") return "";
   const durations = selectedFiles.map((file) => fileMetadata.get(file)?.duration).filter(Number.isFinite);
@@ -547,15 +545,13 @@ function updateModeUI({ resetFiles }) {
 }
 
 function setBusy(busy) {
+  conversionInProgress = busy;
   convertButton.disabled = busy;
-  fileInput.disabled = busy;
+  form.querySelectorAll("input, select").forEach((control) => { control.disabled = busy; });
   clearFilesButton.disabled = busy;
-  videoQuality.disabled = busy;
-  videoResolution.disabled = busy;
-  gifWidth.disabled = busy;
-  gifFps.disabled = busy;
-  trimStart.disabled = busy;
-  trimEnd.disabled = busy;
+  fileList.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+  dropZone.classList.toggle("is-disabled", busy);
+  dropZone.setAttribute("aria-disabled", String(busy));
   resetDefaultsButton.disabled = busy;
   cancelButton.classList.toggle("is-hidden", !busy);
   cancelButton.disabled = !busy;
@@ -588,10 +584,6 @@ function getSizeComparison(input, output) {
   const change = difference >= 0 ? `${difference}% smaller` : `${Math.abs(difference)}% larger`;
   return `${formatBytes(input)} → ${formatBytes(output)} · ${change}`;
 }
-function formatBytes(bytes) { if (!bytes) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); const value = bytes / 1024 ** index; return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`; }
-function formatDuration(seconds) { const total = Math.max(0, Math.floor(seconds)); const hours = Math.floor(total / 3600); const minutes = Math.floor((total % 3600) / 60); const secs = total % 60; return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}` : `${minutes}:${String(secs).padStart(2, "0")}`; }
-function getFileExtension(name) { return name.includes(".") ? name.split(".").pop().toLowerCase() : ""; }
-function safeBaseName(name) { return name.replace(/\.[^/.]+$/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "converted-media"; }
 function localAssetURL(path) { return new URL(path, window.location.href).href; }
 function setProgress(percent) { progressBar.style.width = `${percent}%`; }
 function setStatus(message) { statusMessage.textContent = message; }

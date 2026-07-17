@@ -22,6 +22,7 @@ This version includes three conversion modes:
 - Limits GIF clips to 15 seconds to protect browser memory.
 - Supports selecting, reviewing, and converting multiple files in one queue.
 - Supports optional time-based trimming with `MM:SS` or `HH:MM:SS` start and end values.
+- Locks the queue and conversion settings while a batch is running so every file uses a consistent configuration.
 - Provides smaller, balanced, and high-quality MP4 presets plus original, 1080p, 720p, and 480p resolution choices.
 - Shows a local preview with duration and resolution before conversion.
 - Tracks pending, active, completed, failed, and cancelled queue items individually.
@@ -48,11 +49,13 @@ All branding resources are bundled locally. The application does not request log
 ## Structure
 
 ```text
-Converter/
+beetales-converter/
 |-- index.html
 |-- style.css
 |-- theme.css
 |-- app.js
+|-- converter-utils.js
+|-- package.json
 |-- favicon.ico
 |-- favicon.png
 |-- assets/
@@ -65,8 +68,9 @@ Converter/
 |       |-- core/
 |       |-- ffmpeg/
 |       `-- util/
-|-- README.md
-`-- README2.md
+|-- test/
+|   `-- converter-utils.test.js
+`-- README.md
 ```
 
 ## How It Works
@@ -90,7 +94,7 @@ For browser security reasons, serve the app from a local web server instead of o
 With Python:
 
 ```bash
-cd video-to-audio-web
+cd beetales-converter
 python3 -m http.server 8080
 ```
 
@@ -104,6 +108,16 @@ On Windows, if `python` is not available globally, use any local static server o
 
 Opening `index.html` directly with `file://` is not recommended because browsers can block JavaScript modules, Web Workers, or WebAssembly files required by ffmpeg.wasm.
 
+## Validation
+
+The deterministic conversion helpers have dependency-free tests that run with Node.js:
+
+```bash
+npm test
+```
+
+The application itself remains a static site and does not require an install or build step.
+
 ## GitHub Pages Deployment
 
 The app can run on GitHub Pages because it is fully static.
@@ -115,12 +129,12 @@ index.html
 style.css
 theme.css
 app.js
+converter-utils.js
 favicon.ico
 favicon.png
 assets/
 vendor/
 README.md
-README2.md
 ```
 
 Make sure the `vendor/ffmpeg` folder is committed. The converter depends on these local ffmpeg.wasm files and does not load the conversion engine from a CDN.
@@ -139,15 +153,15 @@ sudo apt install nginx -y
 2. Copy the files to the web directory:
 
 ```bash
-sudo mkdir -p /var/www/video-to-audio-web
-sudo cp -r index.html style.css app.js assets vendor README.md README2.md /var/www/video-to-audio-web/
-sudo chown -R www-data:www-data /var/www/video-to-audio-web
+sudo mkdir -p /var/www/beetales-converter
+sudo cp -r index.html style.css theme.css app.js converter-utils.js assets vendor README.md /var/www/beetales-converter/
+sudo chown -R www-data:www-data /var/www/beetales-converter
 ```
 
 3. Create the server block:
 
 ```bash
-sudo nano /etc/nginx/sites-available/video-to-audio-web
+sudo nano /etc/nginx/sites-available/beetales-converter
 ```
 
 Suggested configuration:
@@ -157,7 +171,7 @@ server {
     listen 80;
     server_name your-domain.com;
 
-    root /var/www/video-to-audio-web;
+    root /var/www/beetales-converter;
     index index.html;
 
     location / {
@@ -178,7 +192,7 @@ server {
 4. Enable the site and reload Nginx:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/video-to-audio-web /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/beetales-converter /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```

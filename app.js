@@ -387,6 +387,7 @@ async function convertFile(file, mode, index, trim) {
 function renderResults(results, mode) {
   resultsList.replaceChildren();
   resultsPanel.classList.remove("is-hidden");
+  resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   const completed = results.filter((result) => !result.error);
   completedResults = completed;
   resultsSummary.textContent = `${completed.length}/${results.length} completed`;

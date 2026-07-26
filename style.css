@@ -1067,6 +1067,13 @@ legend {
   font-size: 1.05rem;
 }
 
+.results-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .results-tools {
   display: flex;
   align-items: center;

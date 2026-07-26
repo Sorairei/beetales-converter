@@ -140,7 +140,8 @@ legend,
 #status-message,
 .setting-help,
 .result-card span,
-.preview-heading > span {
+.preview-heading > span,
+.results-hint {
   color: var(--muted);
 }
 

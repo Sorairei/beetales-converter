@@ -461,7 +461,7 @@ async function convertToWebP(file, index, trim) {
     const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
     const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
     const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
-    const args = ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter}`, "-loop", "0", "-f", "webp", "-lossless", "0", "-quality", "80", outputName];
+    const args = ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter}`, "-loop", "0", "-f", "webp", "-lossless", "0", "-quality", "90", outputName];
     const exitCode = await ffmpeg.exec(args);
     if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
     wroteOutput = true;
@@ -532,7 +532,7 @@ function getGifArgs(inputName, outputName, trim) {
   const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
   const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
   const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
-  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=sierra2_4a`, "-loop", "0", "-f", "gif", outputName];
+    return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter},split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`, "-loop", "0", "-f", "gif", outputName];
 }
 
 function getGifCropFilter() {

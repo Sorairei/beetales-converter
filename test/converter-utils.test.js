@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   formatBytes,
   formatDuration,
+  getCropFilter,
   getFileExtension,
   getTrimDurationArgs,
   getTrimInputArgs,
@@ -46,4 +47,10 @@ test("filename helpers normalize safe output names", () => {
   assert.equal(safeBaseName("  Canción final (v2).mov"), "Cancion-final-v2");
   assert.equal(safeBaseName("***.mp4"), "converted-media");
   assert.equal(safeBaseName(`${"a".repeat(100)}.mp4`).length, 80);
+});
+
+test("getCropFilter produces correct ffmpeg crop string", () => {
+  assert.equal(getCropFilter(0, 0, 640, 480), "crop=640:480:0:0");
+  assert.equal(getCropFilter(100, 50, 320, 240), "crop=320:240:100:50");
+  assert.equal(getCropFilter(10, 10, 321, 241), "crop=320:240:10:10");
 });

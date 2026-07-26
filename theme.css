@@ -231,6 +231,31 @@ legend,
   background: var(--panel-soft);
 }
 
+.crop-container {
+  border-radius: 6px;
+  background: #05070b;
+}
+
+.crop-box {
+  border-color: var(--accent-strong);
+}
+
+.crop-handle {
+  background: var(--accent-strong);
+}
+
+.crop-action-button {
+  border-color: var(--line);
+  background: var(--panel-strong);
+  color: var(--muted);
+}
+
+.crop-action-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 143, 74, 0.1);
+  color: var(--text);
+}
+
 .file-label {
   color: var(--accent-strong);
 }

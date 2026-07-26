@@ -45,3 +45,9 @@ export function safeBaseName(name) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "converted-media";
 }
+
+export function getCropFilter(x, y, w, h) {
+  const cw = w % 2 === 0 ? w : w - 1;
+  const ch = h % 2 === 0 ? h : h - 1;
+  return `crop=${cw}:${ch}:${x}:${y}`;
+}

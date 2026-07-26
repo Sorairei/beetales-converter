@@ -3,6 +3,7 @@ import { fetchFile } from "./vendor/ffmpeg/util/index.js";
 import {
   formatBytes,
   formatDuration,
+  getCropFilter,
   getFileExtension,
   getTrimDurationArgs,
   getTrimInputArgs,
@@ -49,6 +50,18 @@ const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
 const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution, #gif-width, #gif-fps');
 
+const cropContainer = $("#crop-container");
+const cropOverlay = $("#crop-overlay");
+const cropBox = $("#crop-box");
+const cropDimensions = $("#crop-dimensions");
+const cropActions = $("#crop-actions");
+const cropSelectButton = $("#crop-select-button");
+const cropResetButton = $("#crop-reset-button");
+const cropShadeTop = $("#crop-shade-top");
+const cropShadeLeft = $("#crop-shade-left");
+const cropShadeRight = $("#crop-shade-right");
+const cropShadeBottom = $("#crop-shade-bottom");
+
 const ffmpeg = new FFmpeg();
 let ffmpegReady = false;
 let ffmpegLoadPromise = null;
@@ -61,6 +74,15 @@ let completedResults = [];
 let conversionInProgress = false;
 const fileMetadata = new Map();
 const fileStates = new Map();
+
+let cropActive = false;
+let cropDragging = false;
+let cropResizing = false;
+let cropResizeHandle = null;
+let cropStartX = 0;
+let cropStartY = 0;
+let cropStartRect = null;
+let cropRect = null;
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
@@ -118,6 +140,8 @@ downloadAllButton.addEventListener("click", downloadAllResults);
 resetDefaultsButton.addEventListener("click", restoreAllDefaults);
 form.addEventListener("submit", async (event) => { event.preventDefault(); await convertQueue(); });
 window.addEventListener("beforeunload", () => { resetResults(); resetPreview(); });
+cropSelectButton.addEventListener("click", activateCrop);
+cropResetButton.addEventListener("click", resetCrop);
 restorePreferences();
 updateModeUI({ resetFiles: false });
 
@@ -145,6 +169,7 @@ async function handleFiles(fileCollection) {
   if (rejected) showError(`${rejected} incompatible file${rejected === 1 ? " was" : "s were"} left out of the queue.`);
   setStatus(`${selectedFiles.length} ${modeContent[mode].ready}`);
   showPreview(selectedFiles[0]);
+  if (mode === "gif") cropActions.classList.remove("is-hidden");
   await Promise.all(selectedFiles.map(loadMediaMetadata));
   renderQueue();
   updatePreviewMetadata(selectedFiles[0]);
@@ -292,6 +317,8 @@ function resetPreview() {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = null;
   previewPanel.classList.add("is-hidden");
+  resetCrop();
+  cropActions.classList.add("is-hidden");
 }
 
 function loadMediaMetadata(file) {
@@ -409,8 +436,16 @@ function getMp4Args(inputName, outputName, encoder, trim) {
 }
 
 function getGifArgs(inputName, outputName, trim) {
-  const filter = `[0:v]fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=sierra2_4a`;
-  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", filter, "-loop", "0", "-f", "gif", outputName];
+  const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
+  const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
+  const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=sierra2_4a`, "-loop", "0", "-f", "gif", outputName];
+}
+
+function getGifCropFilter() {
+  const nat = getNaturalCrop();
+  if (!nat) return "";
+  return getCropFilter(nat.x, nat.y, nat.w, nat.h);
 }
 
 function getTrimSettings() {
@@ -506,6 +541,8 @@ function restoreAllDefaults() {
   trimStart.value = "";
   trimEnd.value = "";
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
+  resetCrop();
+  cropActions.classList.add("is-hidden");
   updateModeUI({ resetFiles: false });
   clearError();
   setProgress(0);
@@ -539,6 +576,12 @@ function updateModeUI({ resetFiles }) {
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
   dropHint.textContent = modeContent[mode].dropHint;
+  if (isGif && selectedFiles.length) {
+    cropActions.classList.remove("is-hidden");
+  } else {
+    cropActions.classList.add("is-hidden");
+    resetCrop();
+  }
   if (resetFiles) clearSelection();
   setBusy(false);
   setStatus(modeContent[mode].empty);
@@ -589,3 +632,139 @@ function setProgress(percent) { progressBar.style.width = `${percent}%`; }
 function setStatus(message) { statusMessage.textContent = message; }
 function showError(message) { errorMessage.textContent = message; errorMessage.classList.remove("is-hidden"); }
 function clearError() { errorMessage.textContent = ""; errorMessage.classList.add("is-hidden"); }
+
+function activateCrop() {
+  cropActive = true;
+  cropOverlay.classList.remove("is-hidden");
+  cropBox.classList.remove("is-hidden");
+  cropSelectButton.classList.add("is-hidden");
+  cropResetButton.classList.remove("is-hidden");
+  videoPreview.pause();
+  setDefaultCropRect();
+}
+
+function resetCrop() {
+  cropActive = false;
+  cropRect = null;
+  cropOverlay.classList.add("is-hidden");
+  cropBox.classList.add("is-hidden");
+  cropDimensions.classList.add("is-hidden");
+  cropSelectButton.classList.remove("is-hidden");
+  cropResetButton.classList.add("is-hidden");
+}
+
+function setDefaultCropRect() {
+  const vw = videoPreview.clientWidth;
+  const vh = videoPreview.clientHeight;
+  if (!vw || !vh) return;
+  const margin = 0.15;
+  cropRect = {
+    x: Math.round(vw * margin),
+    y: Math.round(vh * margin),
+    w: Math.round(vw * (1 - 2 * margin)),
+    h: Math.round(vh * (1 - 2 * margin)),
+  };
+  renderCropBox();
+}
+
+function renderCropBox() {
+  if (!cropRect) return;
+  cropBox.style.left = cropRect.x + "px";
+  cropBox.style.top = cropRect.y + "px";
+  cropBox.style.width = cropRect.w + "px";
+  cropBox.style.height = cropRect.h + "px";
+  cropShadeTop.style.height = cropRect.y + "px";
+  cropShadeLeft.style.top = cropRect.y + "px";
+  cropShadeLeft.style.height = cropRect.h + "px";
+  cropShadeLeft.style.width = cropRect.x + "px";
+  cropShadeRight.style.top = cropRect.y + "px";
+  cropShadeRight.style.height = cropRect.h + "px";
+  cropShadeRight.style.width = (videoPreview.clientWidth - cropRect.x - cropRect.w) + "px";
+  cropShadeBottom.style.top = (cropRect.y + cropRect.h) + "px";
+  cropShadeBottom.style.height = (videoPreview.clientHeight - cropRect.y - cropRect.h) + "px";
+  cropDimensions.classList.remove("is-hidden");
+  updateCropDimensions();
+}
+
+function updateCropDimensions() {
+  if (!cropRect) return;
+  const nat = getNaturalCrop();
+  cropDimensions.textContent = `${Math.round(nat.w)} × ${Math.round(nat.h)} px`;
+}
+
+function getNaturalCrop() {
+  if (!cropRect) return null;
+  const vw = videoPreview.clientWidth;
+  const vh = videoPreview.clientHeight;
+  const nw = videoPreview.videoWidth;
+  const nh = videoPreview.videoHeight;
+  if (!vw || !vh || !nw || !nh) return null;
+  return {
+    x: Math.round(cropRect.x * (nw / vw)),
+    y: Math.round(cropRect.y * (nh / vh)),
+    w: Math.round(cropRect.w * (nw / vw)),
+    h: Math.round(cropRect.h * (nh / vh)),
+  };
+}
+
+cropBox.addEventListener("mousedown", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!cropActive) return;
+  cropDragging = true;
+  cropStartX = event.clientX;
+  cropStartY = event.clientY;
+  cropStartRect = { ...cropRect };
+  videoPreview.controls = false;
+});
+
+Array.from(cropBox.querySelectorAll(".crop-handle")).forEach((handle) => {
+  handle.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!cropActive) return;
+    cropResizing = true;
+    cropResizeHandle = handle.dataset.handle;
+    cropStartX = event.clientX;
+    cropStartY = event.clientY;
+    cropStartRect = { ...cropRect };
+    videoPreview.controls = false;
+  });
+});
+
+document.addEventListener("mousemove", (event) => {
+  if (!cropDragging && !cropResizing) return;
+  const dx = event.clientX - cropStartX;
+  const dy = event.clientY - cropStartY;
+  const vw = videoPreview.clientWidth;
+  const vh = videoPreview.clientHeight;
+  if (cropDragging) {
+    cropRect.x = clamp(cropStartRect.x + dx, 0, vw - cropRect.w);
+    cropRect.y = clamp(cropStartRect.y + dy, 0, vh - cropRect.h);
+  } else if (cropResizing) {
+    applyResize(cropResizeHandle, dx, dy, vw, vh);
+  }
+  renderCropBox();
+});
+
+document.addEventListener("mouseup", () => {
+  if (cropDragging || cropResizing) {
+    cropDragging = false;
+    cropResizing = false;
+    cropResizeHandle = null;
+    cropStartRect = null;
+    videoPreview.controls = true;
+  }
+});
+
+function applyResize(handle, dx, dy, vw, vh) {
+  const minSize = 30;
+  let { x, y, w, h } = cropStartRect;
+  if (handle.includes("e")) w = clamp(w + dx, minSize, vw - x);
+  if (handle.includes("w")) { const newX = x + dx; w = w - dx; if (w >= minSize && newX >= 0) { x = newX; } else { w = x + w - (newX < 0 ? 0 : newX); x = newX < 0 ? 0 : x; } }
+  if (handle.includes("s")) h = clamp(h + dy, minSize, vh - y);
+  if (handle.includes("n")) { const newY = y + dy; h = h - dy; if (h >= minSize && newY >= 0) { y = newY; } else { h = y + h - (newY < 0 ? 0 : newY); y = newY < 0 ? 0 : y; } }
+  cropRect = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+}
+
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }

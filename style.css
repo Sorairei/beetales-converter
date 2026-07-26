@@ -565,6 +565,165 @@ h1 {
   background: #05070b;
 }
 
+.crop-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.crop-shade {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.crop-shade-top {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.crop-shade-left {
+  bottom: 0;
+  left: 0;
+}
+
+.crop-shade-right {
+  bottom: 0;
+  right: 0;
+}
+
+.crop-shade-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.crop-box {
+  position: absolute;
+  z-index: 6;
+  border: 2px solid var(--accent-strong);
+  cursor: move;
+  pointer-events: auto;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--accent-strong);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+.crop-handle-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+
+.crop-handle-n {
+  top: -6px;
+  left: 50%;
+  margin-left: -6px;
+  cursor: n-resize;
+}
+
+.crop-handle-ne {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+
+.crop-handle-e {
+  top: 50%;
+  margin-top: -6px;
+  right: -6px;
+  cursor: e-resize;
+}
+
+.crop-handle-se {
+  bottom: -6px;
+  right: -6px;
+  cursor: se-resize;
+}
+
+.crop-handle-s {
+  bottom: -6px;
+  left: 50%;
+  margin-left: -6px;
+  cursor: s-resize;
+}
+
+.crop-handle-sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: sw-resize;
+}
+
+.crop-handle-w {
+  top: 50%;
+  margin-top: -6px;
+  left: -6px;
+  cursor: w-resize;
+}
+
+.crop-dimensions {
+  position: absolute;
+  z-index: 8;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #e0e0e0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.crop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.crop-action-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.crop-action-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 143, 74, 0.1);
+  color: var(--text);
+}
+
+.crop-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .file-label,
 .file-name,
 .file-size {

@@ -100,6 +100,14 @@ let cropStartY = 0;
 let cropStartRect = null;
 let cropRect = null;
 
+let trimOverlayActive = false;
+let trimOverlayDragging = false;
+let trimOverlayResizing = false;
+let trimOverlayHandle = null;
+let trimOverlayDragStartX = 0;
+let trimOverlayDragStartRange = null;
+let cachedAccentColor = "#91bd59";
+
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
@@ -160,7 +168,11 @@ cropSelectButton.addEventListener("click", activateCrop);
 cropResetButton.addEventListener("click", resetCrop);
 framePrev.addEventListener("click", () => stepFrame(-1));
 frameNext.addEventListener("click", () => stepFrame(1));
-timelineCanvas.addEventListener("click", handleTimelineClick);
+timelineCanvas.addEventListener("mousedown", handleTimelineMouseDown);
+timelineCanvas.addEventListener("mousemove", handleTimelineHover);
+timelineCanvas.addEventListener("mouseleave", handleTimelineHoverEnd);
+trimStart.addEventListener("input", handleTrimInputChange);
+trimEnd.addEventListener("input", handleTrimInputChange);
 videoPreview.addEventListener("timeupdate", () => {
   if (timelineReady) drawTimeline();
   if (waveformReady) drawWaveform();
@@ -356,6 +368,7 @@ function resetPreview() {
   timelineCanvas.classList.add("is-hidden");
   waveformReady = false;
   waveformCanvas.classList.add("is-hidden");
+  trimOverlayActive = false;
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
 }
@@ -758,15 +771,14 @@ function resetCrop() {
 }
 
 function setDefaultCropRect() {
-  const vw = videoPreview.clientWidth;
-  const vh = videoPreview.clientHeight;
-  if (!vw || !vh) return;
+  const vr = getVideoRect();
+  if (!vr.w || !vr.h) return;
   const margin = 0.15;
   cropRect = {
-    x: Math.round(vw * margin),
-    y: Math.round(vh * margin),
-    w: Math.round(vw * (1 - 2 * margin)),
-    h: Math.round(vh * (1 - 2 * margin)),
+    x: Math.round(vr.x + vr.w * margin),
+    y: Math.round(vr.y + vr.h * margin),
+    w: Math.round(vr.w * (1 - 2 * margin)),
+    h: Math.round(vr.h * (1 - 2 * margin)),
   };
   renderCropBox();
 }
@@ -796,18 +808,40 @@ function updateCropDimensions() {
   cropDimensions.textContent = `${Math.round(nat.w)} × ${Math.round(nat.h)} px`;
 }
 
-function getNaturalCrop() {
-  if (!cropRect) return null;
-  const vw = videoPreview.clientWidth;
-  const vh = videoPreview.clientHeight;
+function getVideoRect() {
+  const ew = videoPreview.clientWidth;
+  const eh = videoPreview.clientHeight;
   const nw = videoPreview.videoWidth;
   const nh = videoPreview.videoHeight;
-  if (!vw || !vh || !nw || !nh) return null;
+  if (!ew || !eh || !nw || !nh) return { x: 0, y: 0, w: ew, h: eh };
+  const elementRatio = ew / eh;
+  const videoRatio = nw / nh;
+  let renderW, renderH, offsetX, offsetY;
+  if (videoRatio > elementRatio) {
+    renderW = ew;
+    renderH = ew / videoRatio;
+    offsetX = 0;
+    offsetY = (eh - renderH) / 2;
+  } else {
+    renderH = eh;
+    renderW = eh * videoRatio;
+    offsetX = (ew - renderW) / 2;
+    offsetY = 0;
+  }
+  return { x: offsetX, y: offsetY, w: renderW, h: renderH };
+}
+
+function getNaturalCrop() {
+  if (!cropRect) return null;
+  const vr = getVideoRect();
+  const nw = videoPreview.videoWidth;
+  const nh = videoPreview.videoHeight;
+  if (!vr.w || !vr.h || !nw || !nh) return null;
   return {
-    x: Math.round(cropRect.x * (nw / vw)),
-    y: Math.round(cropRect.y * (nh / vh)),
-    w: Math.round(cropRect.w * (nw / vw)),
-    h: Math.round(cropRect.h * (nh / vh)),
+    x: Math.round((cropRect.x - vr.x) * (nw / vr.w)),
+    y: Math.round((cropRect.y - vr.y) * (nh / vr.h)),
+    w: Math.round(cropRect.w * (nw / vr.w)),
+    h: Math.round(cropRect.h * (nh / vr.h)),
   };
 }
 
@@ -837,18 +871,47 @@ Array.from(cropBox.querySelectorAll(".crop-handle")).forEach((handle) => {
 });
 
 document.addEventListener("mousemove", (event) => {
-  if (!cropDragging && !cropResizing) return;
-  const dx = event.clientX - cropStartX;
-  const dy = event.clientY - cropStartY;
-  const vw = videoPreview.clientWidth;
-  const vh = videoPreview.clientHeight;
-  if (cropDragging) {
-    cropRect.x = clamp(cropStartRect.x + dx, 0, vw - cropRect.w);
-    cropRect.y = clamp(cropStartRect.y + dy, 0, vh - cropRect.h);
-  } else if (cropResizing) {
-    applyResize(cropResizeHandle, dx, dy, vw, vh);
+  if (cropDragging || cropResizing) {
+    const dx = event.clientX - cropStartX;
+    const dy = event.clientY - cropStartY;
+    const vr = getVideoRect();
+    if (cropDragging) {
+      cropRect.x = clamp(cropStartRect.x + dx, vr.x, vr.x + vr.w - cropRect.w);
+      cropRect.y = clamp(cropStartRect.y + dy, vr.y, vr.y + vr.h - cropRect.h);
+    } else if (cropResizing) {
+      applyResize(cropResizeHandle, dx, dy, vr);
+    }
+    renderCropBox();
+    return;
   }
-  renderCropBox();
+  if (!trimOverlayDragging && !trimOverlayResizing) return;
+  const dx = event.clientX - trimOverlayDragStartX;
+  const w = timelineCanvas.clientWidth;
+  const duration = videoPreview.duration;
+  const startRange = trimOverlayDragStartRange;
+  const maxDur = getMaxTrimDuration();
+  const minDur = 1;
+  const dxSeconds = (dx / w) * duration;
+
+  if (trimOverlayDragging) {
+    let newStart = startRange.startSec + dxSeconds;
+    let newEnd = startRange.endSec + dxSeconds;
+    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+    if (newEnd > duration) { newStart -= (newEnd - duration); newEnd = duration; }
+    newStart = Math.max(0, newStart);
+    newEnd = Math.min(duration, newEnd);
+    applyTrimRange(newStart, newEnd);
+  } else if (trimOverlayResizing) {
+    if (trimOverlayHandle === "left") {
+      let newStart = clamp(startRange.startSec + dxSeconds, 0, startRange.endSec - minDur);
+      if (startRange.endSec - newStart > maxDur) newStart = startRange.endSec - maxDur;
+      applyTrimRange(newStart, startRange.endSec);
+    } else {
+      let newEnd = clamp(startRange.endSec + dxSeconds, startRange.startSec + minDur, duration);
+      if (newEnd - startRange.startSec > maxDur) newEnd = startRange.startSec + maxDur;
+      applyTrimRange(startRange.startSec, newEnd);
+    }
+  }
 });
 
 document.addEventListener("mouseup", () => {
@@ -859,15 +922,23 @@ document.addEventListener("mouseup", () => {
     cropStartRect = null;
     videoPreview.controls = true;
   }
+  if (trimOverlayDragging || trimOverlayResizing) {
+    trimOverlayDragging = false;
+    trimOverlayResizing = false;
+    trimOverlayHandle = null;
+    trimOverlayDragStartRange = null;
+  }
 });
 
-function applyResize(handle, dx, dy, vw, vh) {
+function applyResize(handle, dx, dy, vr) {
   const minSize = 30;
   let { x, y, w, h } = cropStartRect;
-  if (handle.includes("e")) w = clamp(w + dx, minSize, vw - x);
-  if (handle.includes("w")) { const newX = x + dx; w = w - dx; if (w >= minSize && newX >= 0) { x = newX; } else { w = x + w - (newX < 0 ? 0 : newX); x = newX < 0 ? 0 : x; } }
-  if (handle.includes("s")) h = clamp(h + dy, minSize, vh - y);
-  if (handle.includes("n")) { const newY = y + dy; h = h - dy; if (h >= minSize && newY >= 0) { y = newY; } else { h = y + h - (newY < 0 ? 0 : newY); y = newY < 0 ? 0 : y; } }
+  const maxX = vr.x + vr.w;
+  const maxY = vr.y + vr.h;
+  if (handle.includes("e")) w = clamp(w + dx, minSize, maxX - x);
+  if (handle.includes("w")) { const newX = clamp(x + dx, vr.x, x + w - minSize); w = w - (newX - x); x = newX; }
+  if (handle.includes("s")) h = clamp(h + dy, minSize, maxY - y);
+  if (handle.includes("n")) { const newY = clamp(y + dy, vr.y, y + h - minSize); h = h - (newY - y); y = newY; }
   cropRect = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
 }
 
@@ -880,11 +951,52 @@ function stepFrame(direction) {
   videoPreview.currentTime = clamp(videoPreview.currentTime + step, 0, videoPreview.duration);
 }
 
-function handleTimelineClick(event) {
+function handleTimelineSeek(event) {
   if (!videoPreview.duration) return;
   const rect = timelineCanvas.getBoundingClientRect();
   const ratio = (event.clientX - rect.left) / rect.width;
   videoPreview.currentTime = clamp(ratio * videoPreview.duration, 0, videoPreview.duration);
+}
+
+function handleTimelineMouseDown(event) {
+  if (!videoPreview.duration) return;
+  const rect = timelineCanvas.getBoundingClientRect();
+  const canvasX = event.clientX - rect.left;
+  if (!trimOverlayActive) {
+    handleTimelineSeek(event);
+    return;
+  }
+  const hit = hitTestTrimOverlay(canvasX);
+  if (hit === "left" || hit === "right") {
+    event.preventDefault();
+    trimOverlayResizing = true;
+    trimOverlayHandle = hit;
+    trimOverlayDragStartX = event.clientX;
+    trimOverlayDragStartRange = { ...getCurrentTrimRange() };
+  } else if (hit === "body") {
+    event.preventDefault();
+    trimOverlayDragging = true;
+    trimOverlayDragStartX = event.clientX;
+    trimOverlayDragStartRange = { ...getCurrentTrimRange() };
+  } else {
+    handleTimelineSeek(event);
+  }
+}
+
+function handleTimelineHover(event) {
+  if (trimOverlayDragging || trimOverlayResizing) return;
+  const rect = timelineCanvas.getBoundingClientRect();
+  const canvasX = event.clientX - rect.left;
+  const hit = hitTestTrimOverlay(canvasX);
+  timelineCanvas.style.cursor =
+    hit === "left" || hit === "right" ? "ew-resize" :
+    hit === "body" ? "move" : "pointer";
+}
+
+function handleTimelineHoverEnd() {
+  if (!trimOverlayDragging && !trimOverlayResizing) {
+    timelineCanvas.style.cursor = "pointer";
+  }
 }
 
 async function generateThumbnails(file) {
@@ -934,6 +1046,8 @@ async function generateThumbnails(file) {
       try { await ffmpeg.deleteFile(`thumb-${i}.jpg`); } catch {}
     }
     timelineReady = true;
+    refreshAccentColor();
+    initTrimOverlay();
     drawTimeline();
   } catch {
     timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
@@ -953,6 +1067,7 @@ function drawTimeline() {
       timelineCtx.drawImage(img, i * thumbW, 0, thumbW, h);
     }
   }
+  drawTrimOverlay(timelineCtx, w, h);
   if (videoPreview.duration) {
     const pos = (videoPreview.currentTime / videoPreview.duration) * w;
     timelineCtx.fillStyle = "rgba(145, 189, 89, 0.8)";
@@ -1007,16 +1122,147 @@ function getGifOutputExtension() {
   return getCheckedValue("gif-output") || "gif";
 }
 
+function refreshAccentColor() {
+  cachedAccentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-strong").trim() || "#91bd59";
+}
+
+function getMaxTrimDuration() {
+  const mode = getMode();
+  if (mode !== "gif") return videoPreview.duration || 0;
+  return 15;
+}
+
+function clampTrimRange(startSec, endSec) {
+  const duration = videoPreview.duration || 0;
+  const maxDur = getMaxTrimDuration();
+  const minDur = 1;
+  if (duration < minDur) return { startSec: 0, endSec: duration };
+  if (endSec - startSec < minDur) {
+    endSec = Math.min(startSec + minDur, duration);
+    if (endSec - startSec < minDur) startSec = endSec - minDur;
+  }
+  if (endSec - startSec > maxDur) endSec = startSec + maxDur;
+  startSec = clamp(startSec, 0, duration - minDur);
+  endSec = clamp(endSec, minDur, duration);
+  return { startSec, endSec };
+}
+
+function applyTrimRange(startSec, endSec) {
+  const clamped = clampTrimRange(startSec, endSec);
+  syncTrimInputs(clamped.startSec, clamped.endSec);
+  drawTimeline();
+}
+
+function syncTrimInputs(startSec, endSec) {
+  const duration = videoPreview.duration || 0;
+  trimStart.value = startSec > 0 ? formatDuration(startSec) : "";
+  trimEnd.value = endSec < duration ? formatDuration(endSec) : "";
+}
+
+function getCurrentTrimRange() {
+  if (!videoPreview.duration) return null;
+  const duration = videoPreview.duration;
+  const parsed = getTrimSettings();
+  if (parsed.error) return { startSec: 0, endSec: Math.min(duration, getMaxTrimDuration()) };
+  return { startSec: parsed.start || 0, endSec: parsed.end || duration };
+}
+
+function initTrimOverlay() {
+  if (!videoPreview.duration || videoPreview.duration < 1) return;
+  const duration = videoPreview.duration;
+  const maxDur = getMaxTrimDuration();
+  trimOverlayActive = true;
+  applyTrimRange(0, Math.min(duration, maxDur));
+}
+
+function hitTestTrimOverlay(canvasX) {
+  if (!trimOverlayActive || !videoPreview.duration) return "none";
+  const w = timelineCanvas.clientWidth;
+  const duration = videoPreview.duration;
+  const range = getCurrentTrimRange();
+  if (!range) return "none";
+  const startPx = (range.startSec / duration) * w;
+  const endPx = (range.endSec / duration) * w;
+  const HANDLE_ZONE = 8;
+  if (canvasX >= startPx - HANDLE_ZONE && canvasX <= startPx + HANDLE_ZONE) return "left";
+  if (canvasX >= endPx - HANDLE_ZONE && canvasX <= endPx + HANDLE_ZONE) return "right";
+  if (canvasX > startPx + HANDLE_ZONE && canvasX < endPx - HANDLE_ZONE) return "body";
+  return "none";
+}
+
+function drawTrimOverlay(ctx, w, h) {
+  if (!trimOverlayActive || !videoPreview.duration) return;
+  const duration = videoPreview.duration;
+  const range = getCurrentTrimRange();
+  if (!range) return;
+  const startPx = (range.startSec / duration) * w;
+  const endPx = (range.endSec / duration) * w;
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(0, 0, startPx, h);
+  ctx.fillRect(endPx, 0, w - endPx, h);
+
+  ctx.fillStyle = "rgba(145, 189, 89, 0.5)";
+  ctx.fillRect(startPx, 0, endPx - startPx, 1);
+  ctx.fillRect(startPx, h - 1, endPx - startPx, 1);
+
+  ctx.fillStyle = cachedAccentColor;
+  ctx.fillRect(startPx - 1, 0, 2, h);
+  ctx.fillRect(endPx - 1, 0, 2, h);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+  const gripY = Math.floor(h / 2) - 2;
+  ctx.fillRect(startPx - 1, gripY, 2, 1);
+  ctx.fillRect(startPx - 1, gripY + 3, 2, 1);
+  ctx.fillRect(endPx - 1, gripY, 2, 1);
+  ctx.fillRect(endPx - 1, gripY + 3, 2, 1);
+
+  drawTimeLabel(ctx, startPx, h, formatDuration(range.startSec), "left");
+  drawTimeLabel(ctx, endPx, h, formatDuration(range.endSec), "right");
+}
+
+function drawTimeLabel(ctx, x, h, text, align) {
+  ctx.font = "bold 9px sans-serif";
+  ctx.textAlign = align === "left" ? "left" : "right";
+  const textX = align === "left" ? x + 5 : x - 5;
+  const textY = 11;
+  const metrics = ctx.measureText(text);
+  const pad = 3;
+  const bgX = align === "left" ? x + 2 : x - metrics.width - pad * 2 - 2;
+  const bgW = metrics.width + pad * 2;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+  ctx.beginPath();
+  ctx.roundRect(bgX, 1, bgW, 13, 3);
+  ctx.fill();
+  ctx.fillStyle = "rgba(220, 230, 255, 0.9)";
+  ctx.fillText(text, textX, textY);
+}
+
+function handleTrimInputChange() {
+  if (!trimOverlayActive || !videoPreview.duration) return;
+  const parsed = getTrimSettings();
+  if (parsed.error) return;
+  const duration = videoPreview.duration;
+  const startSec = parsed.start || 0;
+  const endSec = parsed.end || duration;
+  if (endSec <= startSec) return;
+  clampTrimRange(startSec, endSec);
+  drawTimeline();
+}
+
 function initPreviewTools(mode) {
   frameNav.classList.toggle("is-hidden", mode === "audio");
   if (mode === "audio") {
     timelineCanvas.classList.add("is-hidden");
     waveformCanvas.classList.remove("is-hidden");
+    trimOverlayActive = false;
   } else if (mode === "gif") {
     waveformCanvas.classList.add("is-hidden");
     timelineCanvas.classList.remove("is-hidden");
+    refreshAccentColor();
   } else {
     timelineCanvas.classList.add("is-hidden");
     waveformCanvas.classList.add("is-hidden");
+    trimOverlayActive = false;
   }
 }

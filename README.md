@@ -58,7 +58,7 @@ The application is made from static HTML, CSS, JavaScript, images, and WebAssemb
 | Local processing | Files remain on the device and are processed by ffmpeg.wasm in the browser |
 | Audio | MP3, WAV, and AAC output with 128k, 192k, or 320k bitrate options |
 | MP4 | WebM-to-MP4 conversion and MP4 optimization with quality and resolution controls |
-| GIF | Animated GIF clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS |
+| GIF | Animated GIF clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS with optional area crop |
 | Editing | Optional trimming with `MM:SS` or `HH:MM:SS` start and end values |
 | Batch workflow | Multi-file queue, per-file state, overall progress, cancellation, and batch download |
 | Preview | Local video preview with duration, dimensions, and before/after file sizes |
@@ -72,9 +72,9 @@ The application is made from static HTML, CSS, JavaScript, images, and WebAssemb
 | --- | --- | --- | --- |
 | Extract audio | Common video formats including MP4, MOV, MKV, and WebM | MP3, WAV, or AAC | Format, bitrate, and trim range |
 | Convert or optimize MP4 | WebM and MP4 | MP4 | Quality preset, target resolution, and trim range |
-| Video to GIF | Compatible browser video files | Animated GIF | Width, frame rate, and trim range |
+| Video to GIF | Compatible browser video files | Animated GIF | Width, frame rate, trim range, and visual crop selection |
 
-MP4 output supports smaller, balanced, and high-quality presets together with original, 1080p, 720p, and 480p resolution choices. GIF clips are limited to 15 seconds to protect browser memory.
+MP4 output supports smaller, balanced, and high-quality presets together with original, 1080p, 720p, and 480p resolution choices. GIF clips are limited to 15 seconds to protect browser memory. The GIF mode includes a visual crop tool that lets users select a specific area of the video frame before conversion.
 
 ## How it works
 
@@ -120,7 +120,7 @@ flowchart LR
 
 - **Interface layer:** `index.html`, `style.css`, and `theme.css` define the responsive converter and BeeTales visual identity.
 - **Application layer:** `app.js` owns queue state, previews, validation, ffmpeg lifecycle, progress, cancellation, and downloads.
-- **Utility layer:** `converter-utils.js` contains deterministic time, filename, trim-argument, and formatting helpers.
+- **Utility layer:** `converter-utils.js` contains deterministic time, filename, trim-argument, crop-filter, and formatting helpers.
 - **Runtime layer:** `vendor/ffmpeg` contains the browser modules, worker code, and WebAssembly core required for conversion.
 - **Test layer:** Node's built-in test runner validates deterministic helpers without adding production dependencies.
 
@@ -132,8 +132,11 @@ flowchart LR
 - Individual queue items report loading, active, completed, failed, or cancelled states.
 - MP4 conversion first attempts H.264 and falls back to MPEG-4 when necessary.
 - GIF creation uses a generated palette for more consistent color output.
+- GIF mode includes an optional visual crop tool with draggable handles for selecting a specific frame area.
+- Conversion time varies with video size, resolution, and device capabilities.
 - Audio extraction maps the first compatible audio stream and reports media without one.
 - Completed files include original size, output size, and the resulting percentage change.
+- The results panel scrolls into view automatically after conversion with a guidance note pointing to the download buttons.
 - A floating reset action clears files, results, trim values, and saved preferences.
 
 ## Repository structure
@@ -251,7 +254,7 @@ npm test
 
 | Check | Purpose |
 | --- | --- |
-| Utility tests | Cover supported and malformed time values, trim arguments, byte and duration formatting, extensions, and safe filenames |
+| Utility tests | Cover supported and malformed time values, trim arguments, crop filter generation, byte and duration formatting, extensions, and safe filenames |
 | JavaScript syntax checks | Confirm application and utility modules parse successfully |
 | Browser interaction checks | Exercise mode switching, reset behavior, queue locking, failure recovery, and responsive layout |
 | Local-reference checks | Confirm that HTML scripts, styles, icons, and images resolve from committed paths |

@@ -392,7 +392,7 @@ function detectCodec(file) {
   if (type.includes("webm") || ext === "webm") return "VP8";
   if (type.includes("mp4") || ext === "mp4") return "H.264";
   if (type.includes("quicktime") || ext === "mov") return "H.264";
-  if (ext === "mkv" || ext === "webm") return "VP9";
+  if (ext === "mkv") return "VP9";
   if (ext === "avi") return "MPEG-4";
   if (ext === "ogv" || ext === "ogg") return "Theora";
   if (ext === "3gp") return "H.264";
@@ -450,54 +450,30 @@ async function convertFile(file, mode, index, trim) {
 }
 
 async function convertToWebP(file, index, trim) {
+  const token = `${Date.now()}-${index}`;
+  const inputName = `webp-input-${token}.${getFileExtension(file.name) || "video"}`;
   const outputName = getOutputName(file.name, "gif");
-  const targetWidth = parseInt(gifWidth.value, 10);
-  const fps = parseInt(gifFps.value, 10);
-  const startTime = trim.start || 0;
-  const endTime = trim.end || videoPreview.duration;
-  const duration = endTime - startTime;
-  const frameInterval = 1 / fps;
-
-  const probe = document.createElement("video");
-  probe.preload = "metadata";
-  await new Promise((resolve) => { probe.onloadedmetadata = resolve; probe.src = URL.createObjectURL(file); });
-  const aspectRatio = probe.videoHeight / probe.videoWidth;
-  probe.remove();
-
-  const canvas = document.createElement("canvas");
-  canvas.width = targetWidth;
-  canvas.height = Math.round(targetWidth * aspectRatio);
-  const ctx = canvas.getContext("2d");
-
-  const tmpVideo = document.createElement("video");
-  tmpVideo.muted = true;
-  tmpVideo.preload = "auto";
-  tmpVideo.src = URL.createObjectURL(file);
-  await new Promise((resolve) => { tmpVideo.onloadeddata = resolve; });
-
-  const frames = [];
-  const totalFrames = Math.ceil(duration * fps);
-  for (let i = 0; i < totalFrames; i++) {
-    const time = startTime + i * frameInterval;
-    tmpVideo.currentTime = time;
-    await new Promise((resolve) => { tmpVideo.onseeked = resolve; });
-    ctx.drawImage(tmpVideo, 0, 0, canvas.width, canvas.height);
-    frames.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  let wroteInput = false;
+  let wroteOutput = false;
+  try {
+    await ffmpeg.writeFile(inputName, await fetchFile(file));
+    wroteInput = true;
+    const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
+    const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
+    const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
+    const args = ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter}`, "-loop", "0", "-f", "webp", "-lossless", "0", "-quality", "80", outputName];
+    const exitCode = await ffmpeg.exec(args);
+    if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
+    wroteOutput = true;
+    const data = await ffmpeg.readFile(outputName);
+    if (!data?.length) throw new Error("empty-output");
+    const blob = new Blob([data], { type: "image/webp" });
+    const url = URL.createObjectURL(blob);
+    resultUrls.push(url);
+    return { file, outputName, outputSize: blob.size, url };
+  } finally {
+    await cleanupFiles(...(wroteInput ? [inputName] : []), ...(wroteOutput ? [outputName] : []));
   }
-  URL.revokeObjectURL(tmpVideo.src);
-
-  const outCanvas = document.createElement("canvas");
-  outCanvas.width = canvas.width;
-  outCanvas.height = canvas.height;
-  const outCtx = outCanvas.getContext("2d");
-  for (const frame of frames) {
-    outCtx.putImageData(frame, 0, 0);
-  }
-  const blob = await canvasToBlob(outCanvas, "image/webp");
-  if (!blob || !blob.size) throw new Error("webp-encode-failed");
-  const url = URL.createObjectURL(blob);
-  resultUrls.push(url);
-  return { file, outputName, outputSize: blob.size, url };
 }
 
 function renderResults(results, mode) {
@@ -744,7 +720,6 @@ function isMp4SourceFile(file) { return isWebmFile(file) || file.type === "video
 function getOutputName(name, mode) {
   if (mode === "gif") {
     const ext = getGifOutputExtension();
-    const suffix = ext === "webp" ? "-clip" : (getFileExtension(name) === "mp4" ? "-optimized" : "-clip");
     return `${safeBaseName(name)}-clip.${ext}`;
   }
   const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : "";
@@ -917,13 +892,19 @@ async function generateThumbnails(file) {
   thumbnailImages = [];
   timelineReady = false;
   timelineCanvas.classList.remove("is-hidden");
-  timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  const dpr = window.devicePixelRatio || 1;
+  timelineCanvas.width = timelineCanvas.clientWidth * dpr;
+  timelineCanvas.height = timelineCanvas.clientHeight * dpr;
+  timelineCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  timelineCtx.clearRect(0, 0, timelineCanvas.clientWidth, timelineCanvas.clientHeight);
+  const cw = timelineCanvas.clientWidth;
+  const ch = timelineCanvas.clientHeight;
   timelineCtx.fillStyle = "rgba(255,255,255,0.08)";
-  timelineCtx.fillRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  timelineCtx.fillRect(0, 0, cw, ch);
   timelineCtx.fillStyle = "rgba(255,255,255,0.3)";
   timelineCtx.font = "10px sans-serif";
   timelineCtx.textAlign = "center";
-  timelineCtx.fillText("Loading thumbnails...", timelineCanvas.width / 2, timelineCanvas.height / 2 + 3);
+  timelineCtx.fillText("Loading thumbnails...", cw / 2, ch / 2 + 3);
 
   try {
     await loadFfmpeg();
@@ -939,7 +920,7 @@ async function generateThumbnails(file) {
         ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName])
           .then(() => ffmpeg.readFile(outName))
           .then((data) => {
-            const blob = new Blob([data.buffer], { type: "image/jpeg" });
+            const blob = new Blob([data], { type: "image/jpeg" });
             const img = new Image();
             img.src = URL.createObjectURL(blob);
             thumbnailImages[i - 1] = img;
@@ -960,8 +941,8 @@ async function generateThumbnails(file) {
 }
 
 function drawTimeline() {
-  const w = timelineCanvas.width;
-  const h = timelineCanvas.height;
+  const w = timelineCanvas.clientWidth;
+  const h = timelineCanvas.clientHeight;
   timelineCtx.clearRect(0, 0, w, h);
   timelineCtx.fillStyle = "rgba(0,0,0,0.4)";
   timelineCtx.fillRect(0, 0, w, h);
@@ -1024,14 +1005,6 @@ async function decodeAudio(file) {
 
 function getGifOutputExtension() {
   return getCheckedValue("gif-output") || "gif";
-}
-
-function getGifOutputMime() {
-  return getGifOutputExtension() === "webp" ? "image/webp" : "image/gif";
-}
-
-function canvasToBlob(canvas, type) {
-  return new Promise((resolve) => canvas.toBlob(resolve, type, 0.92));
 }
 
 function initPreviewTools(mode) {

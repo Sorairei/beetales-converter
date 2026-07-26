@@ -47,7 +47,9 @@ export function safeBaseName(name) {
 }
 
 export function getCropFilter(x, y, w, h) {
+  const cx = x % 2 === 0 ? x : x - 1;
+  const cy = y % 2 === 0 ? y : y - 1;
   const cw = w % 2 === 0 ? w : w - 1;
   const ch = h % 2 === 0 ? h : h - 1;
-  return `crop=${cw}:${ch}:${x}:${y}`;
+  return `crop=${cw}:${ch}:${Math.max(0, cx)}:${Math.max(0, cy)}`;
 }

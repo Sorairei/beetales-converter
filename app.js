@@ -99,6 +99,7 @@ let cropStartX = 0;
 let cropStartY = 0;
 let cropStartRect = null;
 let cropRect = null;
+let cachedNaturalCrop = null;
 
 let trimOverlayActive = false;
 let trimOverlayDragging = false;
@@ -549,7 +550,7 @@ function getGifArgs(inputName, outputName, trim) {
 }
 
 function getGifCropFilter() {
-  const nat = getNaturalCrop();
+  const nat = cachedNaturalCrop || getNaturalCrop();
   if (!nat) return "";
   return getCropFilter(nat.x, nat.y, nat.w, nat.h);
 }
@@ -751,6 +752,7 @@ function showError(message) { errorMessage.textContent = message; errorMessage.c
 function clearError() { errorMessage.textContent = ""; errorMessage.classList.add("is-hidden"); }
 
 function activateCrop() {
+  if (!videoPreview.videoWidth || !videoPreview.videoHeight) return;
   cropActive = true;
   cropOverlay.classList.remove("is-hidden");
   cropBox.classList.remove("is-hidden");
@@ -763,6 +765,7 @@ function activateCrop() {
 function resetCrop() {
   cropActive = false;
   cropRect = null;
+  cachedNaturalCrop = null;
   cropOverlay.classList.add("is-hidden");
   cropBox.classList.add("is-hidden");
   cropDimensions.classList.add("is-hidden");
@@ -789,17 +792,23 @@ function renderCropBox() {
   cropBox.style.top = cropRect.y + "px";
   cropBox.style.width = cropRect.w + "px";
   cropBox.style.height = cropRect.h + "px";
-  cropShadeTop.style.height = cropRect.y + "px";
+  const vr = getVideoRect();
+  const vLeft = vr.x;
+  const vRight = vr.x + vr.w;
+  const vTop = vr.y;
+  const vBottom = vr.y + vr.h;
+  cropShadeTop.style.height = Math.max(0, cropRect.y - vTop) + "px";
   cropShadeLeft.style.top = cropRect.y + "px";
   cropShadeLeft.style.height = cropRect.h + "px";
-  cropShadeLeft.style.width = cropRect.x + "px";
+  cropShadeLeft.style.width = Math.max(0, cropRect.x - vLeft) + "px";
   cropShadeRight.style.top = cropRect.y + "px";
   cropShadeRight.style.height = cropRect.h + "px";
-  cropShadeRight.style.width = (videoPreview.clientWidth - cropRect.x - cropRect.w) + "px";
+  cropShadeRight.style.width = Math.max(0, vRight - (cropRect.x + cropRect.w)) + "px";
   cropShadeBottom.style.top = (cropRect.y + cropRect.h) + "px";
-  cropShadeBottom.style.height = (videoPreview.clientHeight - cropRect.y - cropRect.h) + "px";
+  cropShadeBottom.style.height = Math.max(0, vBottom - (cropRect.y + cropRect.h)) + "px";
   cropDimensions.classList.remove("is-hidden");
   updateCropDimensions();
+  cachedNaturalCrop = getNaturalCrop();
 }
 
 function updateCropDimensions() {

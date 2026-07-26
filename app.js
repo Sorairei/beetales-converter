@@ -48,7 +48,7 @@ const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], #video-quality, #video-resolution, #gif-width, #gif-fps');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], #video-quality, #video-resolution, #gif-width, #gif-fps');
 
 const cropContainer = $("#crop-container");
 const cropOverlay = $("#crop-overlay");
@@ -61,6 +61,22 @@ const cropShadeTop = $("#crop-shade-top");
 const cropShadeLeft = $("#crop-shade-left");
 const cropShadeRight = $("#crop-shade-right");
 const cropShadeBottom = $("#crop-shade-bottom");
+
+const frameNav = $("#frame-nav");
+const framePrev = $("#frame-prev");
+const frameNext = $("#frame-next");
+const timelineCanvas = $("#timeline-canvas");
+const waveformCanvas = $("#waveform-canvas");
+const timelineCtx = timelineCanvas.getContext("2d");
+const waveformCtx = waveformCanvas.getContext("2d");
+
+const FRAME_STEP = 1 / 30;
+const TIMELINE_THUMBNAILS = 12;
+let thumbnailImages = [];
+let timelineReady = false;
+let audioContext = null;
+let audioBuffer = null;
+let waveformReady = false;
 
 const ffmpeg = new FFmpeg();
 let ffmpegReady = false;
@@ -88,7 +104,7 @@ const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
 const ffmpegWasmURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.wasm");
-const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4", gif: "image/gif" };
+const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4", gif: "image/gif", webp: "image/webp" };
 const audioOutputArgs = {
   mp3: ["-vn", "-map", "0:a:0", "-codec:a", "libmp3lame", "-f", "mp3"],
   wav: ["-vn", "-map", "0:a:0", "-codec:a", "pcm_s16le", "-f", "wav"],
@@ -142,6 +158,13 @@ form.addEventListener("submit", async (event) => { event.preventDefault(); await
 window.addEventListener("beforeunload", () => { resetResults(); resetPreview(); });
 cropSelectButton.addEventListener("click", activateCrop);
 cropResetButton.addEventListener("click", resetCrop);
+framePrev.addEventListener("click", () => stepFrame(-1));
+frameNext.addEventListener("click", () => stepFrame(1));
+timelineCanvas.addEventListener("click", handleTimelineClick);
+videoPreview.addEventListener("timeupdate", () => {
+  if (timelineReady) drawTimeline();
+  if (waveformReady) drawWaveform();
+});
 restorePreferences();
 updateModeUI({ resetFiles: false });
 
@@ -173,6 +196,15 @@ async function handleFiles(fileCollection) {
   await Promise.all(selectedFiles.map(loadMediaMetadata));
   renderQueue();
   updatePreviewMetadata(selectedFiles[0]);
+  const currentMode = getMode();
+  initPreviewTools(currentMode);
+  thumbnailImages = [];
+  timelineReady = false;
+  waveformReady = false;
+  if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
+  audioBuffer = null;
+  if (currentMode === "gif" && selectedFiles[0]) generateThumbnails(selectedFiles[0]);
+  if (currentMode === "audio" && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
 }
 
 function renderQueue() {
@@ -190,7 +222,7 @@ function renderQueue() {
     const remove = document.createElement("button");
     name.textContent = file.name;
     size.textContent = formatBytes(file.size);
-    state.textContent = fileStates.get(file) || formatMediaMetadata(fileMetadata.get(file));
+    state.innerHTML = fileStates.get(file) || formatMediaMetadata(fileMetadata.get(file));
     details.append(name, size, state);
     remove.type = "button";
     remove.textContent = "Remove";
@@ -319,13 +351,25 @@ function resetPreview() {
   previewPanel.classList.add("is-hidden");
   resetCrop();
   cropActions.classList.add("is-hidden");
+  thumbnailImages = [];
+  timelineReady = false;
+  timelineCanvas.classList.add("is-hidden");
+  waveformReady = false;
+  waveformCanvas.classList.add("is-hidden");
+  if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
+  audioBuffer = null;
 }
 
 function loadMediaMetadata(file) {
   return new Promise((resolve) => {
     const probe = document.createElement("video");
     const url = URL.createObjectURL(file);
+    const codec = detectCodec(file);
     const finish = (metadata) => {
+      if (metadata) {
+        metadata.codec = codec;
+        metadata.fps = metadata.fps || null;
+      }
       fileMetadata.set(file, metadata);
       fileStates.set(file, formatMediaMetadata(metadata));
       URL.revokeObjectURL(url);
@@ -333,21 +377,41 @@ function loadMediaMetadata(file) {
       resolve();
     };
     probe.preload = "metadata";
-    probe.onloadedmetadata = () => finish({ duration: probe.duration, width: probe.videoWidth, height: probe.videoHeight });
+    probe.onloadedmetadata = () => {
+      const meta = { duration: probe.duration, width: probe.videoWidth, height: probe.videoHeight, fps: null };
+      finish(meta);
+    };
     probe.onerror = () => finish(null);
     probe.src = url;
   });
 }
 
+function detectCodec(file) {
+  const ext = getFileExtension(file.name);
+  const type = file.type || "";
+  if (type.includes("webm") || ext === "webm") return "VP8";
+  if (type.includes("mp4") || ext === "mp4") return "H.264";
+  if (type.includes("quicktime") || ext === "mov") return "H.264";
+  if (ext === "mkv" || ext === "webm") return "VP9";
+  if (ext === "avi") return "MPEG-4";
+  if (ext === "ogv" || ext === "ogg") return "Theora";
+  if (ext === "3gp") return "H.264";
+  return "Video";
+}
+
 function updatePreviewMetadata(file) {
   if (!file || !previewUrl) return;
-  previewMeta.textContent = formatMediaMetadata(fileMetadata.get(file));
+  previewMeta.innerHTML = formatMediaMetadata(fileMetadata.get(file));
 }
 
 function formatMediaMetadata(metadata) {
   if (!metadata || !Number.isFinite(metadata.duration)) return "Details unavailable";
-  const dimensions = metadata.width && metadata.height ? ` · ${metadata.width}×${metadata.height}` : "";
-  return `${formatDuration(metadata.duration)}${dimensions}`;
+  const parts = [];
+  if (metadata.codec) parts.push(`<span class="meta-tag">${metadata.codec}</span>`);
+  if (metadata.width && metadata.height) parts.push(`<span class="meta-tag">${metadata.height}p</span>`);
+  if (metadata.fps) parts.push(`<span class="meta-tag">${metadata.fps} fps</span>`);
+  parts.push(`<span class="meta-tag">${formatDuration(metadata.duration)}</span>`);
+  return parts.join("");
 }
 
 function getTrimRangeError(trim) {
@@ -360,6 +424,7 @@ function getTrimRangeError(trim) {
 }
 
 async function convertFile(file, mode, index, trim) {
+  if (mode === "gif" && getGifOutputExtension() === "webp") return convertToWebP(file, index, trim);
   const token = `${Date.now()}-${index}`;
   const inputName = `input-${token}.${getFileExtension(file.name) || "video"}`;
   const outputName = getOutputName(file.name, mode);
@@ -384,6 +449,57 @@ async function convertFile(file, mode, index, trim) {
   }
 }
 
+async function convertToWebP(file, index, trim) {
+  const outputName = getOutputName(file.name, "gif");
+  const targetWidth = parseInt(gifWidth.value, 10);
+  const fps = parseInt(gifFps.value, 10);
+  const startTime = trim.start || 0;
+  const endTime = trim.end || videoPreview.duration;
+  const duration = endTime - startTime;
+  const frameInterval = 1 / fps;
+
+  const probe = document.createElement("video");
+  probe.preload = "metadata";
+  await new Promise((resolve) => { probe.onloadedmetadata = resolve; probe.src = URL.createObjectURL(file); });
+  const aspectRatio = probe.videoHeight / probe.videoWidth;
+  probe.remove();
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = Math.round(targetWidth * aspectRatio);
+  const ctx = canvas.getContext("2d");
+
+  const tmpVideo = document.createElement("video");
+  tmpVideo.muted = true;
+  tmpVideo.preload = "auto";
+  tmpVideo.src = URL.createObjectURL(file);
+  await new Promise((resolve) => { tmpVideo.onloadeddata = resolve; });
+
+  const frames = [];
+  const totalFrames = Math.ceil(duration * fps);
+  for (let i = 0; i < totalFrames; i++) {
+    const time = startTime + i * frameInterval;
+    tmpVideo.currentTime = time;
+    await new Promise((resolve) => { tmpVideo.onseeked = resolve; });
+    ctx.drawImage(tmpVideo, 0, 0, canvas.width, canvas.height);
+    frames.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  }
+  URL.revokeObjectURL(tmpVideo.src);
+
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = canvas.width;
+  outCanvas.height = canvas.height;
+  const outCtx = outCanvas.getContext("2d");
+  for (const frame of frames) {
+    outCtx.putImageData(frame, 0, 0);
+  }
+  const blob = await canvasToBlob(outCanvas, "image/webp");
+  if (!blob || !blob.size) throw new Error("webp-encode-failed");
+  const url = URL.createObjectURL(blob);
+  resultUrls.push(url);
+  return { file, outputName, outputSize: blob.size, url };
+}
+
 function renderResults(results, mode) {
   resultsList.replaceChildren();
   resultsPanel.classList.remove("is-hidden");
@@ -406,7 +522,7 @@ function renderResults(results, mode) {
       const link = document.createElement("a");
       link.href = result.url;
       link.download = result.outputName;
-      link.textContent = modeContent[mode].download;
+      link.textContent = mode === "gif" ? `Download ${getGifOutputExtension().toUpperCase()}` : modeContent[mode].download;
       link.addEventListener("click", (event) => { event.preventDefault(); forceDownload(result.url, result.outputName); });
       card.append(link);
     }
@@ -508,6 +624,7 @@ function savePreferences() {
     mode: getMode(),
     format: getCheckedValue("format"),
     bitrate: getCheckedValue("bitrate"),
+    gifOutput: getCheckedValue("gif-output"),
     quality: videoQuality.value,
     resolution: videoResolution.value,
     gifWidth: gifWidth.value,
@@ -523,6 +640,7 @@ function restorePreferences() {
     setCheckedValue("mode", preferences.mode);
     setCheckedValue("format", preferences.format);
     setCheckedValue("bitrate", preferences.bitrate);
+    if (preferences.gifOutput) setCheckedValue("gif-output", preferences.gifOutput);
     setSelectValue(videoQuality, preferences.quality);
     setSelectValue(videoResolution, preferences.resolution);
     setSelectValue(gifWidth, preferences.gifWidth);
@@ -535,6 +653,7 @@ function restoreAllDefaults() {
   setCheckedValue("mode", "audio");
   setCheckedValue("format", "mp3");
   setCheckedValue("bitrate", "128k");
+  setCheckedValue("gif-output", "gif");
   videoQuality.value = "23";
   videoResolution.value = "original";
   gifWidth.value = "480";
@@ -577,6 +696,7 @@ function updateModeUI({ resetFiles }) {
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
   dropHint.textContent = modeContent[mode].dropHint;
+  initPreviewTools(mode);
   if (isGif && selectedFiles.length) {
     cropActions.classList.remove("is-hidden");
   } else {
@@ -609,7 +729,7 @@ function getFriendlyError(error, mode) {
   if (message.includes("timeout") || message.includes("abort")) return "The conversion engine took too long to load. Refresh and try again.";
   if (message.includes("memory")) return "The browser ran out of memory. Try fewer or smaller files.";
   if (message.includes("empty-output")) return "No output file was generated.";
-  if (mode === "gif") return "This video could not be converted to GIF. Try a shorter clip or smaller GIF size.";
+  if (mode === "gif") return `This video could not be converted to ${getGifOutputExtension().toUpperCase()}. Try a shorter clip or smaller size.`;
   if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "No compatible audio track was found.";
   return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "This video could not be converted.";
 }
@@ -621,8 +741,16 @@ function isValidFileForMode(file, mode) { return mode === "mp4" ? isMp4SourceFil
 function isVideoFile(file) { return file.type.startsWith("video/") || ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"].includes(getFileExtension(file.name)); }
 function isWebmFile(file) { return file.type === "video/webm" || getFileExtension(file.name) === "webm"; }
 function isMp4SourceFile(file) { return isWebmFile(file) || file.type === "video/mp4" || getFileExtension(file.name) === "mp4"; }
-function getOutputName(name, mode) { const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : mode === "gif" ? "-clip" : ""; return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`; }
-function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : mode === "gif" ? "gif" : getCheckedValue("format"); }
+function getOutputName(name, mode) {
+  if (mode === "gif") {
+    const ext = getGifOutputExtension();
+    const suffix = ext === "webp" ? "-clip" : (getFileExtension(name) === "mp4" ? "-optimized" : "-clip");
+    return `${safeBaseName(name)}-clip.${ext}`;
+  }
+  const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : "";
+  return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`;
+}
+function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : mode === "gif" ? getGifOutputExtension() : getCheckedValue("format"); }
 function getSizeComparison(input, output) {
   const difference = input ? Math.round((1 - output / input) * 100) : 0;
   const change = difference >= 0 ? `${difference}% smaller` : `${Math.abs(difference)}% larger`;
@@ -769,3 +897,153 @@ function applyResize(handle, dx, dy, vw, vh) {
 }
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+
+function stepFrame(direction) {
+  if (!videoPreview.duration) return;
+  videoPreview.pause();
+  const step = direction * FRAME_STEP;
+  videoPreview.currentTime = clamp(videoPreview.currentTime + step, 0, videoPreview.duration);
+}
+
+function handleTimelineClick(event) {
+  if (!videoPreview.duration) return;
+  const rect = timelineCanvas.getBoundingClientRect();
+  const ratio = (event.clientX - rect.left) / rect.width;
+  videoPreview.currentTime = clamp(ratio * videoPreview.duration, 0, videoPreview.duration);
+}
+
+async function generateThumbnails(file) {
+  if (!file || timelineReady) return;
+  thumbnailImages = [];
+  timelineReady = false;
+  timelineCanvas.classList.remove("is-hidden");
+  timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  timelineCtx.fillStyle = "rgba(255,255,255,0.08)";
+  timelineCtx.fillRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  timelineCtx.fillStyle = "rgba(255,255,255,0.3)";
+  timelineCtx.font = "10px sans-serif";
+  timelineCtx.textAlign = "center";
+  timelineCtx.fillText("Loading thumbnails...", timelineCanvas.width / 2, timelineCanvas.height / 2 + 3);
+
+  try {
+    await loadFfmpeg();
+    const inputName = `thumb-input.${getFileExtension(file.name) || "video"}`;
+    await ffmpeg.writeFile(inputName, await fetchFile(file));
+    const duration = fileMetadata.get(file)?.duration || videoPreview.duration || 10;
+    const interval = duration / (TIMELINE_THUMBNAILS + 1);
+    const promises = [];
+    for (let i = 1; i <= TIMELINE_THUMBNAILS; i++) {
+      const time = interval * i;
+      const outName = `thumb-${i}.jpg`;
+      promises.push(
+        ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName])
+          .then(() => ffmpeg.readFile(outName))
+          .then((data) => {
+            const blob = new Blob([data.buffer], { type: "image/jpeg" });
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+            thumbnailImages[i - 1] = img;
+          })
+          .catch(() => {})
+      );
+    }
+    await Promise.all(promises);
+    await cleanupFiles(inputName);
+    for (let i = 1; i <= TIMELINE_THUMBNAILS; i++) {
+      try { await ffmpeg.deleteFile(`thumb-${i}.jpg`); } catch {}
+    }
+    timelineReady = true;
+    drawTimeline();
+  } catch {
+    timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  }
+}
+
+function drawTimeline() {
+  const w = timelineCanvas.width;
+  const h = timelineCanvas.height;
+  timelineCtx.clearRect(0, 0, w, h);
+  timelineCtx.fillStyle = "rgba(0,0,0,0.4)";
+  timelineCtx.fillRect(0, 0, w, h);
+  const thumbW = w / TIMELINE_THUMBNAILS;
+  for (let i = 0; i < thumbnailImages.length; i++) {
+    const img = thumbnailImages[i];
+    if (img && img.complete && img.naturalWidth) {
+      timelineCtx.drawImage(img, i * thumbW, 0, thumbW, h);
+    }
+  }
+  if (videoPreview.duration) {
+    const pos = (videoPreview.currentTime / videoPreview.duration) * w;
+    timelineCtx.fillStyle = "rgba(145, 189, 89, 0.8)";
+    timelineCtx.fillRect(pos - 1, 0, 2, h);
+  }
+}
+
+function drawWaveform() {
+  const w = waveformCanvas.width;
+  const h = waveformCanvas.height;
+  waveformCtx.clearRect(0, 0, w, h);
+  if (!audioBuffer) return;
+  const data = audioBuffer.getChannelData(0);
+  const step = Math.ceil(data.length / w);
+  const mid = h / 2;
+  waveformCtx.lineWidth = 1;
+  waveformCtx.strokeStyle = "rgba(145, 189, 89, 0.7)";
+  waveformCtx.beginPath();
+  waveformCtx.moveTo(0, mid);
+  for (let i = 0; i < w; i++) {
+    let min = 1;
+    let max = -1;
+    for (let j = 0; j < step; j++) {
+      const datum = data[(i * step) + j] || 0;
+      if (datum < min) min = datum;
+      if (datum > max) max = datum;
+    }
+    waveformCtx.lineTo(i, mid + min * mid);
+    waveformCtx.lineTo(i, mid + max * mid);
+  }
+  waveformCtx.stroke();
+  if (videoPreview.duration) {
+    const pos = (videoPreview.currentTime / videoPreview.duration) * w;
+    waveformCtx.fillStyle = "rgba(145, 189, 89, 0.8)";
+    waveformCtx.fillRect(pos - 1, 0, 2, h);
+  }
+}
+
+async function decodeAudio(file) {
+  if (audioContext) { try { audioContext.close(); } catch {} }
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const arrayBuffer = await file.arrayBuffer();
+  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  waveformReady = true;
+  waveformCanvas.width = waveformCanvas.clientWidth * (window.devicePixelRatio || 1);
+  waveformCanvas.height = waveformCanvas.clientHeight * (window.devicePixelRatio || 1);
+  waveformCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+  drawWaveform();
+}
+
+function getGifOutputExtension() {
+  return getCheckedValue("gif-output") || "gif";
+}
+
+function getGifOutputMime() {
+  return getGifOutputExtension() === "webp" ? "image/webp" : "image/gif";
+}
+
+function canvasToBlob(canvas, type) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, 0.92));
+}
+
+function initPreviewTools(mode) {
+  frameNav.classList.toggle("is-hidden", mode === "audio");
+  if (mode === "audio") {
+    timelineCanvas.classList.add("is-hidden");
+    waveformCanvas.classList.remove("is-hidden");
+  } else if (mode === "gif") {
+    waveformCanvas.classList.add("is-hidden");
+    timelineCanvas.classList.remove("is-hidden");
+  } else {
+    timelineCanvas.classList.add("is-hidden");
+    waveformCanvas.classList.add("is-hidden");
+  }
+}

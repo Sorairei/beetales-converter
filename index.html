@@ -125,10 +125,14 @@
                 <p class="file-label">Preview</p>
                 <h2 id="preview-title"></h2>
               </div>
-              <span id="preview-meta"></span>
+              <span class="preview-meta-bar" id="preview-meta"></span>
             </div>
             <div class="crop-container" id="crop-container">
               <video id="video-preview" controls preload="metadata"></video>
+              <div class="frame-nav" id="frame-nav">
+                <button class="frame-nav-button" id="frame-prev" type="button" aria-label="Previous frame" title="Previous frame">&#9664;</button>
+                <button class="frame-nav-button" id="frame-next" type="button" aria-label="Next frame" title="Next frame">&#9654;</button>
+              </div>
               <div class="crop-overlay is-hidden" id="crop-overlay">
                 <div class="crop-shade crop-shade-top" id="crop-shade-top"></div>
                 <div class="crop-shade crop-shade-left" id="crop-shade-left"></div>
@@ -146,6 +150,10 @@
                 </div>
                 <span class="crop-dimensions is-hidden" id="crop-dimensions"></span>
               </div>
+            </div>
+            <div class="preview-tools">
+              <canvas class="timeline-canvas is-hidden" id="timeline-canvas" height="48"></canvas>
+              <canvas class="waveform-canvas is-hidden" id="waveform-canvas" height="48"></canvas>
             </div>
             <div class="crop-actions is-hidden" id="crop-actions">
               <button class="crop-action-button" id="crop-select-button" type="button">Select area</button>
@@ -231,6 +239,19 @@
           </div>
 
           <div class="settings-grid gif-settings is-hidden" id="gif-settings">
+            <fieldset>
+              <legend>Output format</legend>
+              <div class="segmented-control">
+                <label>
+                  <input type="radio" name="gif-output" value="gif" checked />
+                  <span>GIF</span>
+                </label>
+                <label>
+                  <input type="radio" name="gif-output" value="webp" />
+                  <span>WebP</span>
+                </label>
+              </div>
+            </fieldset>
             <fieldset>
               <legend>GIF size</legend>
               <select class="setting-select" id="gif-width" name="gif-width">

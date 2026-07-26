@@ -58,10 +58,11 @@ The application is made from static HTML, CSS, JavaScript, images, and WebAssemb
 | Local processing | Files remain on the device and are processed by ffmpeg.wasm in the browser |
 | Audio | MP3, WAV, and AAC output with 128k, 192k, or 320k bitrate options |
 | MP4 | WebM-to-MP4 conversion and MP4 optimization with quality and resolution controls |
-| GIF | Animated GIF clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS with optional area crop |
+| GIF | Animated GIF or WebP clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS with optional area crop |
 | Editing | Optional trimming with `MM:SS` or `HH:MM:SS` start and end values |
 | Batch workflow | Multi-file queue, per-file state, overall progress, cancellation, and batch download |
-| Preview | Local video preview with duration, dimensions, and before/after file sizes |
+| Preview | Local video preview with metadata bar, frame-by-frame navigation, thumbnail timeline, and before/after file sizes |
+| Audio tools | Waveform visualization for identifying sections of interest before extraction |
 | Preferences | Last-used mode and output settings are remembered in `localStorage` |
 | Resource safety | GIF duration limits, validated trim ranges, sequential processing, and worker cleanup |
 | Interface | Responsive English UI with the nocturnal BeeTales swamp identity |
@@ -72,9 +73,9 @@ The application is made from static HTML, CSS, JavaScript, images, and WebAssemb
 | --- | --- | --- | --- |
 | Extract audio | Common video formats including MP4, MOV, MKV, and WebM | MP3, WAV, or AAC | Format, bitrate, and trim range |
 | Convert or optimize MP4 | WebM and MP4 | MP4 | Quality preset, target resolution, and trim range |
-| Video to GIF | Compatible browser video files | Animated GIF | Width, frame rate, trim range, and visual crop selection |
+| Video to GIF/WebP | Compatible browser video files | Animated GIF or WebP | Width, frame rate, trim range, and visual crop selection |
 
-MP4 output supports smaller, balanced, and high-quality presets together with original, 1080p, 720p, and 480p resolution choices. GIF clips are limited to 15 seconds to protect browser memory. The GIF mode includes a visual crop tool that lets users select a specific area of the video frame before conversion.
+MP4 output supports smaller, balanced, and high-quality presets together with original, 1080p, 720p, and 480p resolution choices. GIF clips are limited to 15 seconds to protect browser memory. The GIF mode includes a visual crop tool that lets users select a specific area of the video frame before conversion, and a WebP output option for smaller file sizes with modern compression.
 
 ## How it works
 
@@ -128,10 +129,15 @@ flowchart LR
 
 - Files are processed one at a time to reduce peak browser memory use.
 - Compatible and incompatible files are reported before conversion begins.
+- A metadata bar displays codec, resolution, FPS, and duration for each loaded file.
+- Frame-by-frame navigation buttons allow precise positioning for trim and crop.
 - Trim values are checked against the real duration of the shortest selected file.
+- A thumbnail timeline renders extracted frames as a visual scrubbing reference in GIF mode.
+- Audio mode shows a waveform visualization decoded with the Web Audio API to help identify sections of interest.
 - Individual queue items report loading, active, completed, failed, or cancelled states.
 - MP4 conversion first attempts H.264 and falls back to MPEG-4 when necessary.
 - GIF creation uses a generated palette for more consistent color output.
+- WebP output uses canvas-based frame extraction for smaller, modern animated images.
 - GIF mode includes an optional visual crop tool with draggable handles for selecting a specific frame area.
 - Conversion time varies with video size, resolution, and device capabilities.
 - Audio extraction maps the first compatible audio stream and reports media without one.
@@ -266,7 +272,9 @@ The application remains a static site. Running tests does not require installing
 - Conversion speed depends on the device, browser, input codec, duration, and output settings.
 - Large or high-resolution files can exceed browser memory limits.
 - MP4 conversion and optimization are more CPU-intensive than audio extraction.
-- GIF clips are intentionally limited to 15 seconds.
+- GIF and WebP clips are intentionally limited to 15 seconds.
+- WebP animated output relies on canvas frame extraction and may produce larger files than GIF for some content.
+- Thumbnail timeline and waveform generation add processing time when files are first loaded.
 - Browser codec support can affect preview metadata even when ffmpeg can read the file.
 - Downloads are temporary and are not preserved after the page is closed or reloaded.
 - Multiple automatic downloads may require explicit browser permission.
@@ -282,6 +290,9 @@ The application remains a static site. Running tests does not require installing
 | Browser runs out of memory | Process fewer, shorter, or lower-resolution files |
 | No audio output is generated | Confirm that the source contains a compatible audio stream |
 | GIF conversion fails | Choose a shorter trim range or a smaller GIF width and frame rate |
+| WebP conversion fails | Try a shorter clip or smaller width; ensure the browser supports `image/webp` canvas export |
+| Thumbnail timeline is blank | Wait for thumbnails to load after selecting a file; large files may take longer |
+| Waveform not visible | Audio decoding may fail for very large files; try a shorter clip |
 | MP4 conversion is slow | Use a smaller output resolution or the smaller-file quality preset |
 
 ## Contributing

@@ -2389,6 +2389,15 @@ function getAtempoChain(speed) {
 // Sprint 5 — Karaoke & Dynamic Subtitles Logic
 // =====================================================================
 
+function detectLyricsLanguage(text) {
+  if (!text) return "spanish";
+  const lower = text.toLowerCase();
+  if (/[áéíóúñ¿¡]/.test(lower)) return "spanish";
+  const spanishHits = (lower.match(/\b(de|que|en|el|la|los|las|por|para|con|un|una|del|al|es|son|mi|tu|su|yo|gracias|corazon|corazón|vida|padre|amor|cuna|tierra|fuerte)\b/g) || []).length;
+  const englishHits = (lower.match(/\b(the|and|to|of|in|i|you|that|it|he|was|for|on|are|as|with|his|they|at|be|this|have|from)\b/g) || []).length;
+  return spanishHits >= englishHits ? "spanish" : "english";
+}
+
 let visualizerAnimFrame = null;
 
 function initKaraokeStudio() {
@@ -2473,14 +2482,15 @@ function initKaraokeStudio() {
           throw new Error("Could not extract PCM audio data from media file.");
         }
 
-        updateAiStatus("Connecting to in-browser Whisper AI (~39MB)...", 25);
+        const lang = detectLyricsLanguage(text);
+        updateAiStatus(`Connecting to in-browser Whisper AI (${lang.toUpperCase()})...`, 25);
 
-        // Run client-side Whisper ASR with progress tracking
-        const whisperChunks = await transcribeWithWhisperAI(targetBuffer, {}, (prog) => {
+        // Run client-side Whisper ASR with progress tracking and language acceleration
+        const whisperChunks = await transcribeWithWhisperAI(targetBuffer, { language: lang }, (prog) => {
           if (prog.status === "downloading") {
             updateAiStatus(`Downloading Whisper AI model (~39MB): ${prog.percent}%`, Math.round(25 + (prog.percent * 0.45)));
-          } else if (prog.status === "transcribing") {
-            updateAiStatus("AI recognizing sung words & acoustic timestamps...", 85);
+          } else if (prog.status === "transcribing" || prog.status === "chunk") {
+            updateAiStatus(prog.message || "AI recognizing sung words...", prog.percent || 75);
           } else if (prog.message) {
             updateAiStatus(prog.message);
           }

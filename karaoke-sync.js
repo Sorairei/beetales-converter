@@ -1637,8 +1637,17 @@ export async function transcribeWithWhisperAI(audioData, options = {}, onProgres
         } else if (msg.status === "transcribing") {
           onProgress({
             status: "transcribing",
-            percent: 85,
+            percent: msg.percent || 50,
             message: "AI analyzing voice phonemes & acoustic timestamps in background...",
+          });
+        } else if (msg.status === "chunk") {
+          const previewText = msg.text ? `"${msg.text.slice(0, 30)}..."` : "processing...";
+          onProgress({
+            status: "chunk",
+            percent: msg.percent,
+            chunkIndex: msg.chunkIndex,
+            totalChunks: msg.totalChunks,
+            message: `AI recognized (${msg.chunkIndex}/${msg.totalChunks}): ${previewText}`,
           });
         } else if (msg.status === "loaded") {
           onProgress({

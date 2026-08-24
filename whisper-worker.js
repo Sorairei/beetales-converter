@@ -43,18 +43,36 @@ self.addEventListener("message", async (event) => {
         }
       });
 
+      const totalEstimatedChunks = Math.max(1, Math.ceil(data.length / (16000 * 25)));
+      let chunkCount = 0;
+
       self.postMessage({
         type: "progress",
         status: "transcribing",
+        totalChunks: totalEstimatedChunks,
+        percent: 50,
       });
+
+      const targetLanguage = options?.language || "spanish";
 
       // Execute speech-to-text with word-level timestamps in background thread
       const output = await transcriber(data, {
         return_timestamps: "word",
         chunk_length_s: 30,
         stride_length_s: 5,
-        language: options?.language || null,
+        language: targetLanguage,
         task: "transcribe",
+        chunk_callback: (chunk) => {
+          chunkCount++;
+          self.postMessage({
+            type: "progress",
+            status: "chunk",
+            chunkIndex: chunkCount,
+            totalChunks: totalEstimatedChunks,
+            text: (chunk?.text || "").trim(),
+            percent: Math.min(95, Math.round(50 + (chunkCount / totalEstimatedChunks) * 45)),
+          });
+        },
       });
 
       self.postMessage({

@@ -15,6 +15,8 @@ import {
   SUBTITLE_PRESETS,
   autoAlignLyricsWithAudio,
   shiftTimestamps,
+  drawKaraokeSubtitlesOnCanvas,
+  drawAudioVisualizerBackground,
 } from "../karaoke-sync.js";
 
 test("splitLyricsIntoWords divides text into structured word objects with blocks", () => {
@@ -160,4 +162,44 @@ test("shiftTimestamps nudges all word timings forward or backward", () => {
   shiftTimestamps(words, -0.3);
   assert.equal(words[0].start, 1.2);
   assert.equal(words[0].end, 2.2);
+});
+
+test("drawKaraokeSubtitlesOnCanvas and drawAudioVisualizerBackground execute on mock 2D context", () => {
+  const words = [
+    { id: 0, text: "Hello", start: 1.0, end: 2.0, blockIndex: 0 },
+    { id: 1, text: "World", start: 2.0, end: 3.0, blockIndex: 0 },
+  ];
+
+  const calls = [];
+  const mockCtx = {
+    save: () => calls.push("save"),
+    restore: () => calls.push("restore"),
+    beginPath: () => calls.push("beginPath"),
+    rect: () => calls.push("rect"),
+    roundRect: () => calls.push("roundRect"),
+    fill: () => calls.push("fill"),
+    stroke: () => calls.push("stroke"),
+    arc: () => calls.push("arc"),
+    fillText: (text) => calls.push(`fillText:${text}`),
+    strokeText: (text) => calls.push(`strokeText:${text}`),
+    measureText: (text) => ({ width: text.length * 10 }),
+    translate: () => calls.push("translate"),
+    scale: () => calls.push("scale"),
+    clearRect: () => calls.push("clearRect"),
+    fillRect: () => calls.push("fillRect"),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+  };
+
+  // Subtitle drawing test
+  drawKaraokeSubtitlesOnCanvas(mockCtx, 1280, 720, 1.5, words, SUBTITLE_PRESETS.tiktok);
+  assert.ok(calls.includes("save"));
+  assert.ok(calls.includes("restore"));
+  assert.ok(calls.some((c) => c.startsWith("fillText")));
+
+  // Visualizer background test
+  calls.length = 0;
+  drawAudioVisualizerBackground(mockCtx, 1280, 720, 1.5);
+  assert.ok(calls.includes("fillRect"));
+  assert.ok(calls.includes("arc"));
 });

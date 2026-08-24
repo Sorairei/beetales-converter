@@ -750,3 +750,201 @@ export function shiftTimestamps(words, offsetSeconds) {
     }
   });
 }
+
+/**
+ * Draws dynamic styled subtitles directly onto an HTML5 2D canvas frame
+ * Compatible with MediaRecorder and Canvas export pipelines
+ */
+export function drawKaraokeSubtitlesOnCanvas(ctx, width, height, currentTime, words, style = {}) {
+  if (!ctx || !words || !words.length) return;
+  const cfg = { ...SUBTITLE_PRESETS.tiktok, ...style };
+
+  const syncedWords = words.filter((w) => w.start !== null && w.end !== null);
+  if (!syncedWords.length) return;
+
+  // Find active word or block
+  let activeWord = syncedWords.find((w) => currentTime >= w.start && currentTime <= w.end);
+  let activeBlockIndex = activeWord ? activeWord.blockIndex : null;
+
+  if (activeBlockIndex === null) {
+    const blocks = groupWordsByBlock(syncedWords);
+    for (const block of blocks) {
+      if (!block.length) continue;
+      const bMin = Math.min(...block.map((w) => w.start));
+      const bMax = Math.max(...block.map((w) => w.end));
+      if (currentTime >= bMin && currentTime <= bMax + 0.3) {
+        activeBlockIndex = block[0].blockIndex;
+        break;
+      }
+    }
+  }
+
+  if (activeBlockIndex === null) return;
+
+  const blockWords = syncedWords.filter((w) => w.blockIndex === activeBlockIndex);
+  if (!blockWords.length) return;
+
+  // Resolution scaling (base 1280x720)
+  const scaleFactor = Math.min(width / 1280, height / 720);
+  const fontSize = Math.round((cfg.fontSize || 48) * scaleFactor);
+  const strokeWidth = Math.round((cfg.strokeWidth || 4) * scaleFactor);
+  const fontFamily = cfg.fontFamily || "Montserrat, sans-serif";
+
+  ctx.save();
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
+  ctx.textBaseline = "middle";
+
+  const wordMetrics = blockWords.map((w) => {
+    const text = cfg.uppercase ? w.text.toUpperCase() : w.text;
+    const m = ctx.measureText(text);
+    return {
+      word: w,
+      text,
+      width: m.width,
+    };
+  });
+
+  const spaceWidth = ctx.measureText(" ").width;
+  const totalWidth = wordMetrics.reduce((sum, item) => sum + item.width, 0) + (wordMetrics.length - 1) * spaceWidth;
+
+  // Vertical position
+  let centerY = height * 0.82; // bottom
+  if (cfg.position === "middle" || cfg.position === "center") {
+    centerY = height * 0.5;
+  } else if (cfg.position === "top") {
+    centerY = height * 0.18;
+  }
+
+  // Draw semi-transparent background capsule for high contrast
+  const padX = 24 * scaleFactor;
+  const padY = 16 * scaleFactor;
+  const boxX = (width - totalWidth) / 2 - padX;
+  const boxY = centerY - (fontSize / 2) - padY;
+  const boxW = totalWidth + (padX * 2);
+  const boxH = fontSize + (padY * 2);
+
+  ctx.fillStyle = "rgba(4, 12, 6, 0.65)";
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(boxX, boxY, boxW, boxH, 12 * scaleFactor);
+  } else {
+    ctx.rect(boxX, boxY, boxW, boxH);
+  }
+  ctx.fill();
+  ctx.strokeStyle = "rgba(110, 200, 50, 0.25)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Draw words
+  let cursorX = (width - totalWidth) / 2;
+
+  wordMetrics.forEach(({ word, text, width: wWidth }) => {
+    const isActive = activeWord && activeWord.id === word.id;
+    const isPassed = word.end !== null && currentTime > word.end;
+
+    ctx.save();
+
+    let fillColor = cfg.primaryColor || "#FFFFFF";
+    let glowEffect = false;
+    let wordScale = 1.0;
+
+    if (isActive) {
+      fillColor = cfg.activeColor || "#FFE600";
+      glowEffect = true;
+      wordScale = 1.14; // Pop jump effect
+    } else if (isPassed) {
+      fillColor = cfg.activeColor || "#FFE600";
+      ctx.globalAlpha = 0.9;
+    } else {
+      fillColor = cfg.primaryColor || "#FFFFFF";
+      ctx.globalAlpha = 0.75;
+    }
+
+    const wordCenterX = cursorX + (wWidth / 2);
+    const wordCenterY = centerY;
+
+    ctx.translate(wordCenterX, wordCenterY);
+    if (wordScale !== 1.0) {
+      ctx.scale(wordScale, wordScale);
+    }
+
+    // Shadow & Glow
+    if (glowEffect && (cfg.glow || cfg.activeColor)) {
+      ctx.shadowColor = cfg.activeColor || "#FFE600";
+      ctx.shadowBlur = 18 * scaleFactor;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    } else if (cfg.shadowDistance > 0) {
+      ctx.shadowColor = cfg.shadowColor || "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 8 * scaleFactor;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = (cfg.shadowDistance || 3) * scaleFactor;
+    }
+
+    // Stroke
+    if (strokeWidth > 0 && cfg.strokeColor && cfg.strokeColor !== "transparent") {
+      ctx.strokeStyle = cfg.strokeColor || "#000000";
+      ctx.lineWidth = strokeWidth * 2;
+      ctx.lineJoin = "round";
+      ctx.strokeText(text, -wWidth / 2, 0);
+    }
+
+    // Fill
+    ctx.fillStyle = fillColor;
+    ctx.fillText(text, -wWidth / 2, 0);
+
+    ctx.restore();
+
+    cursorX += wWidth + spaceWidth;
+  });
+
+  ctx.restore();
+}
+
+/**
+ * Draws animated neon circuit equalizer visualizer on 2D canvas for audio tracks
+ */
+export function drawAudioVisualizerBackground(ctx, width, height, currentTime) {
+  if (!ctx) return;
+
+  // Background gradient
+  const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 20, width / 2, height / 2, width / 1.5);
+  bgGrad.addColorStop(0, "#0a2615");
+  bgGrad.addColorStop(0.6, "#040f08");
+  bgGrad.addColorStop(1, "#020603");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  const midY = height * 0.45;
+  const bars = 44;
+  const barWidth = (width * 0.75) / bars;
+  const startX = (width - (bars * barWidth)) / 2;
+
+  // Circuit ring
+  ctx.strokeStyle = "rgba(110, 200, 50, 0.3)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(width / 2, midY, 140 + Math.sin(currentTime * 6) * 12, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Equalizer spectrum bars
+  for (let i = 0; i < bars; i++) {
+    const wave = Math.sin(currentTime * 7 + i * 0.45) * Math.cos(currentTime * 4.5 - i * 0.25) * 0.65 + 0.35;
+    const barHeight = Math.max(8, Math.abs(wave) * 120);
+    const x = startX + i * barWidth;
+
+    const grad = ctx.createLinearGradient(0, midY - barHeight, 0, midY + barHeight);
+    grad.addColorStop(0, "#6EC832");
+    grad.addColorStop(0.5, "#FFE600");
+    grad.addColorStop(1, "#6EC832");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(x + 2, midY - barHeight, barWidth - 4, barHeight * 2, 4);
+    } else {
+      ctx.rect(x + 2, midY - barHeight, barWidth - 4, barHeight * 2);
+    }
+    ctx.fill();
+  }
+}

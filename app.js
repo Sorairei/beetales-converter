@@ -22,6 +22,8 @@ import {
   KaraokeSyncEngine,
   autoAlignLyricsWithAudio,
   shiftTimestamps,
+  drawKaraokeSubtitlesOnCanvas,
+  drawAudioVisualizerBackground,
 } from "./karaoke-sync.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -676,6 +678,181 @@ function getTrimRangeError(trim) {
   return "";
 }
 
+async function burnKaraokeVideo(file, words, style, trim, index) {
+  const token = `${Date.now()}-${index}`;
+  const recName = `rec-${token}.webm`;
+  const outputName = getOutputName(file.name, "karaoke");
+  const isAudio = isAudioFile(file);
+  const metadata = fileMetadata.get(file);
+  const fileDuration = metadata?.duration || videoPreview.duration || 30;
+
+  const startSec = trim?.start || 0;
+  const endSec = trim?.end !== undefined ? trim.end : fileDuration;
+  const clipDuration = Math.max(1, endSec - startSec);
+
+  const width = 1280;
+  const height = 720;
+  const fps = 30;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  const mediaEl = document.createElement(isAudio ? "audio" : "video");
+  mediaEl.playsInline = true;
+  mediaEl.muted = false;
+  mediaEl.crossOrigin = "anonymous";
+  const mediaUrl = URL.createObjectURL(file);
+  mediaEl.src = mediaUrl;
+
+  await new Promise((resolve) => {
+    mediaEl.onloadedmetadata = () => resolve();
+    mediaEl.onerror = () => resolve();
+    setTimeout(resolve, 3000);
+  });
+
+  const canvasStream = canvas.captureStream(fps);
+
+  let audioCtx = null;
+  let combinedStream = canvasStream;
+
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaElementSource(mediaEl);
+    const dest = audioCtx.createMediaStreamDestination();
+    source.connect(dest);
+    combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks(),
+    ]);
+  } catch (err) {
+    console.warn("AudioContext stream routing fallback:", err);
+  }
+
+  let mimeType = "video/webm;codecs=vp9,opus";
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm;codecs=vp8,opus";
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm";
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "";
+
+  const chunks = [];
+  const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType, videoBitsPerSecond: 6000000 } : {});
+  recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
+  };
+
+  const recordPromise = new Promise((resolve) => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType || "video/webm" }));
+  });
+
+  recorder.start(100);
+
+  let isRunning = true;
+  mediaEl.currentTime = startSec;
+  await mediaEl.play().catch(() => {});
+
+  const renderLoop = () => {
+    if (!isRunning) return;
+    const curTime = mediaEl.currentTime || 0;
+
+    ctx.clearRect(0, 0, width, height);
+
+    if (isAudio) {
+      drawAudioVisualizerBackground(ctx, width, height, curTime);
+    } else {
+      if (mediaEl.readyState >= 2) {
+        ctx.drawImage(mediaEl, 0, 0, width, height);
+      } else {
+        ctx.fillStyle = "#040c06";
+        ctx.fillRect(0, 0, width, height);
+      }
+    }
+
+    drawKaraokeSubtitlesOnCanvas(ctx, width, height, curTime, words, style);
+
+    const progress = Math.min(99, Math.round(((curTime - startSec) / clipDuration) * 100));
+    setProgress(progress);
+    setStatus(`Rendering & burning subtitles into MP4... ${progress}%`);
+
+    if (curTime < endSec && !mediaEl.ended && !cancelRequested) {
+      requestAnimationFrame(renderLoop);
+    }
+  };
+
+  requestAnimationFrame(renderLoop);
+
+  await new Promise((resolve) => {
+    mediaEl.onended = () => resolve();
+    mediaEl.ontimeupdate = () => {
+      if (mediaEl.currentTime >= endSec - 0.05 || cancelRequested) resolve();
+    };
+    setTimeout(resolve, (clipDuration + 5) * 1000);
+  });
+
+  isRunning = false;
+  mediaEl.pause();
+  recorder.stop();
+  const recordedBlob = await recordPromise;
+
+  if (audioCtx) {
+    try { await audioCtx.close(); } catch {}
+  }
+  URL.revokeObjectURL(mediaUrl);
+
+  if (cancelRequested) throw new Error("conversion-cancelled");
+
+  setStatus("Finalizing H.264 MP4 export...");
+
+  let wroteInput = false;
+  let wroteOutput = false;
+  try {
+    await ffmpeg.writeFile(recName, await fetchFile(recordedBlob));
+    wroteInput = true;
+
+    const ffmpegArgs = [
+      "-hide_banner",
+      "-y",
+      "-i", recName,
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-crf", "22",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-pix_fmt", "yuv420p",
+      "-movflags", "+faststart",
+      "-f", "mp4",
+      outputName,
+    ];
+
+    const exitCode = await ffmpeg.exec(ffmpegArgs);
+    if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
+    wroteOutput = true;
+
+    const data = await ffmpeg.readFile(outputName);
+    if (!data?.length) throw new Error("empty-output");
+
+    const finalBlob = new Blob([data], { type: "video/mp4" });
+    const url = URL.createObjectURL(finalBlob);
+    resultUrls.push(url);
+
+    recordConversionHistory({
+      name: file.name,
+      outputName,
+      mode: "karaoke",
+      inputSize: file.size,
+      outputSize: finalBlob.size,
+      timestamp: Date.now(),
+    });
+
+    return { file, outputName, outputSize: finalBlob.size, url };
+  } finally {
+    await cleanupFiles(
+      ...(wroteInput ? [recName] : []),
+      ...(wroteOutput ? [outputName] : [])
+    );
+  }
+}
+
 async function convertFile(file, mode, index, trim) {
   if (mode === "gif" && getGifOutputExtension() === "webp") return convertToWebP(file, index, trim);
   const token = `${Date.now()}-${index}`;
@@ -702,53 +879,9 @@ async function convertFile(file, mode, index, trim) {
       wroteExtAudio = true;
     }
 
-    if (mode === "karaoke") {
-      const style = getActiveKaraokeStyle();
-      const assData = exportAss(karaokeEngine.words, style);
-      await ffmpeg.writeFile(assName, new TextEncoder().encode(assData));
-      wroteAss = true;
-    }
-
     let initialArgs;
     if (mode === "karaoke") {
-      const isAudioOnly = isAudioFile(file);
-      if (isAudioOnly) {
-        initialArgs = [
-          "-hide_banner", "-y",
-          "-f", "lavfi", "-i", "color=c=0x040c06:s=1920x1080:r=30",
-          ...getTrimInputArgs(trim),
-          "-i", inputName,
-          ...getTrimDurationArgs(trim),
-          "-vf", `subtitles=${assName}`,
-          "-c:v", "libx264",
-          "-preset", "veryfast",
-          "-crf", "22",
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-pix_fmt", "yuv420p",
-          "-shortest",
-          "-movflags", "+faststart",
-          "-f", "mp4",
-          outputName,
-        ];
-      } else {
-        initialArgs = [
-          "-hide_banner", "-y",
-          ...getTrimInputArgs(trim),
-          "-i", inputName,
-          ...getTrimDurationArgs(trim),
-          "-vf", `subtitles=${assName}`,
-          "-c:v", "libx264",
-          "-preset", "veryfast",
-          "-crf", "22",
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-pix_fmt", "yuv420p",
-          "-movflags", "+faststart",
-          "-f", "mp4",
-          outputName,
-        ];
-      }
+      return await burnKaraokeVideo(file, karaokeEngine.words, getActiveKaraokeStyle(), trim, index);
     } else if (mode === "mp4") {
       initialArgs = getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null);
     } else if (mode === "gif") {

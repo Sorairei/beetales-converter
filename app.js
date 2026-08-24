@@ -2426,18 +2426,16 @@ function initKaraokeStudio() {
   if (karaokeAutoSyncBtn) {
     karaokeAutoSyncBtn.addEventListener("click", async () => {
       const text = (karaokeLyricsInput?.value || "").trim();
-      let words = karaokeEngine.words;
-      if (!words.length) {
-        if (!text) {
-          showError("Please paste your lyrics or script in the box first.");
-          karaokeLyricsInput?.focus();
-          return;
-        }
-        words = splitLyricsIntoWords(text, {
-          wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
-          preserveLineBreaks: true,
-        });
+      if (!text) {
+        showError("Please paste your lyrics or script in the box first.");
+        karaokeLyricsInput?.focus();
+        return;
       }
+
+      const words = splitLyricsIntoWords(text, {
+        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
+        preserveLineBreaks: true,
+      });
 
       clearError();
       setStatus("⚡ Analyzing audio waveform, voice onsets and intro pauses...");

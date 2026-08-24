@@ -106,6 +106,8 @@ export const translations = {
     karaoke_opt_5words: "5 words (Karaoke Line)",
     karaoke_opt_full: "Full lines (Natural)",
     karaoke_parse_button: "Prepare Words for Sync",
+    karaoke_auto_sync_button: "⚡ Auto-Sync with Audio",
+    karaoke_auto_sync_hint: "Automatically analyzes audio waves & vocal pauses to sync all words with 1 click!",
     karaoke_import_file_label: "Upload .LRC or .SRT file",
 
     karaoke_sync_title: "Interactive Tap-to-Sync",
@@ -113,6 +115,9 @@ export const translations = {
     karaoke_tap_button: "Tap Word (Space)",
     karaoke_undo_button: "Undo (Ctrl+Z)",
     karaoke_reset_button: "Reset Sync",
+    karaoke_offset_label: "Shift time:",
+    karaoke_offset_minus: "-0.2s",
+    karaoke_offset_plus: "+0.2s",
     karaoke_progress_label: "Sync Progress:",
 
     karaoke_style_title: "Visual Style & Animations",
@@ -200,7 +205,7 @@ export const translations = {
     guide_sec_modes_audio: "• Extract Audio (MP3 / WAV / AAC): Strips video tracks to produce clean audio files with selectable bitrates (128k, 192k, 320k) or lossless WAV.",
     guide_sec_modes_mp4: "• Convert & Optimize MP4: Transcodes WebM or large videos into universal MP4 (H.264 / AAC) with customizable quality (CRF), resolution scaling, and speed adjustment.",
     guide_sec_modes_gif: "• Video to GIF / WebP: Generates lightweight animated GIFs or modern animated WebP with two-pass palette optimization and interactive visual cropping.",
-    guide_sec_modes_karaoke: "• Subtitles & Karaoke Studio: Create TikTok/Shorts pop captions or Karaoke videos. Paste lyrics, sync in real-time with spacebar, and burn styled subtitles into MP4.",
+    guide_sec_modes_karaoke: "• Subtitles & Karaoke Studio: Create TikTok/Shorts pop captions or Karaoke videos. Paste lyrics, sync automatically with 1-click Auto-Sync or in real-time with spacebar, and burn styled subtitles into MP4.",
 
     guide_sec_loudness_h3: "EBU R128 Loudness Normalization",
     guide_sec_loudness_p: "EBU R128 is the international standard for broadcast loudness used by Spotify, YouTube, Apple Music, and Netflix. When enabled, it balances your audio tracks so they don't sound whisper-quiet or violently loud.",
@@ -333,6 +338,8 @@ export const translations = {
     karaoke_opt_5words: "5 palabras (Línea Karaoke)",
     karaoke_opt_full: "Líneas completas (Natural)",
     karaoke_parse_button: "Preparar Palabras para Sincronizar",
+    karaoke_auto_sync_button: "⚡ Auto-Alinear con Audio",
+    karaoke_auto_sync_hint: "¡Analiza automáticamente las ondas de voz para sincronizar todas las palabras con 1 clic!",
     karaoke_import_file_label: "Subir archivo .LRC o .SRT",
 
     karaoke_sync_title: "Sincronizador Interactivo (Tap-to-Sync)",
@@ -340,6 +347,9 @@ export const translations = {
     karaoke_tap_button: "Marcar Palabra (Espacio)",
     karaoke_undo_button: "Deshacer (Ctrl+Z)",
     karaoke_reset_button: "Reiniciar",
+    karaoke_offset_label: "Ajuste de tiempo:",
+    karaoke_offset_minus: "-0.2s",
+    karaoke_offset_plus: "+0.2s",
     karaoke_progress_label: "Progreso de Sincronización:",
 
     karaoke_style_title: "Estilo Visual y Animaciones",
@@ -427,7 +437,7 @@ export const translations = {
     guide_sec_modes_audio: "• Extraer Audio (MP3 / WAV / AAC): Extrae la pista de sonido de tus videos con bitrates personalizables (128k, 192k, 320k) o formato WAV sin compresión.",
     guide_sec_modes_mp4: "• Convertir y Optimizar MP4: Convierte videos WebM o pesados a MP4 universal (H.264 / AAC) ajustando calidad (CRF), escala de resolución (1080p, 720p, 480p) y velocidad.",
     guide_sec_modes_gif: "• Video a GIF / WebP: Genera animaciones GIF fluidas o archivos WebP animados modernos con optimización de paleta en dos pasadas y recorte visual interactivo.",
-    guide_sec_modes_karaoke: "• Estudio de Subtítulos y Karaoke: Crea subtítulos dinámicos para TikTok/Shorts o videos de karaoke. Pega la letra, sincroniza con la barra espaciadora y quema subtítulos estilizados en MP4.",
+    guide_sec_modes_karaoke: "• Estudio de Subtítulos y Karaoke: Crea subtítulos dinámicos para TikTok/Shorts o videos de karaoke. Pega la letra, sincroniza automáticamente con 1 clic o con la barra espaciadora y quema subtítulos estilizados en MP4.",
 
     guide_sec_loudness_h3: "Normalización de Volumen EBU R128",
     guide_sec_loudness_p: "EBU R128 es el estándar internacional de sonoridad usado por Spotify, YouTube, Apple Music y Netflix. Al activarlo, equilibra el volumen de tus pistas de audio para que no suenen ni muy bajas ni con picos molestos de saturación.",
@@ -560,6 +570,8 @@ export const translations = {
     karaoke_opt_5words: "5 palavras (Linha Karaokê)",
     karaoke_opt_full: "Linhas completas (Natural)",
     karaoke_parse_button: "Preparar Palavras para Sincronizar",
+    karaoke_auto_sync_button: "⚡ Sincronizar com Áudio",
+    karaoke_auto_sync_hint: "Analisa automaticamente as ondas sonoras para sincronizar todas as palavras com 1 clique!",
     karaoke_import_file_label: "Carregar arquivo .LRC ou .SRT",
 
     karaoke_sync_title: "Sincronizador Interativo (Tap-to-Sync)",
@@ -567,6 +579,9 @@ export const translations = {
     karaoke_tap_button: "Marcar Palavra (Espaço)",
     karaoke_undo_button: "Desfazer (Ctrl+Z)",
     karaoke_reset_button: "Redefinir",
+    karaoke_offset_label: "Ajuste fino:",
+    karaoke_offset_minus: "-0.2s",
+    karaoke_offset_plus: "+0.2s",
     karaoke_progress_label: "Progresso da Sincronização:",
 
     karaoke_style_title: "Estilo Visual e Animações",
@@ -654,7 +669,7 @@ export const translations = {
     guide_sec_modes_audio: "• Extrair Áudio (MP3 / WAV / AAC): Extrai a faixa de áudio dos seus vídeos com bitrates ajustáveis ou formato WAV sem perdas.",
     guide_sec_modes_mp4: "• Converter e Otimizar MP4: Transforma vídeos WebM ou pesados em MP4 universal (H.264 / AAC) com controle de qualidade, escala e velocidade.",
     guide_sec_modes_gif: "• Vídeo para GIF / WebP: Gera animações GIF fluidas ou WebP moderno com otimização de paleta em duas etapas.",
-    guide_sec_modes_karaoke: "• Estúdio de Legendas e Karaokê: Crie legendas animadas estilo TikTok/Shorts ou vídeos de karaokê sincronizados.",
+    guide_sec_modes_karaoke: "• Estúdio de Legendas e Karaokê: Crie legendas animadas estilo TikTok/Shorts ou vídeos de karaokê sincronizados com 1 clique de auto-sincronização.",
 
     guide_sec_loudness_h3: "Normalização de Volume EBU R128",
     guide_sec_loudness_p: "EBU R128 é o padrão internacional de sonoridade usado pelo Spotify, YouTube e Netflix. Quando ativado, equilibra o volume do áudio para evitar distorções.",
@@ -787,6 +802,8 @@ export const translations = {
     karaoke_opt_5words: "5 słów (Linijka Karaoke)",
     karaoke_opt_full: "Pełne linie (Naturalne)",
     karaoke_parse_button: "Przygotuj Słowa do Synchronizacji",
+    karaoke_auto_sync_button: "⚡ Auto-Dopasuj do Dźwięku",
+    karaoke_auto_sync_hint: "Automatycznie analizuje fale dźwiękowe i pauzy wokalne, aby zsynchronizować wszystkie słowa 1 kliknięciem!",
     karaoke_import_file_label: "Prześlij plik .LRC lub .SRT",
 
     karaoke_sync_title: "Interaktywna Synchronizacja (Tap-to-Sync)",
@@ -794,6 +811,9 @@ export const translations = {
     karaoke_tap_button: "Dotknij Słowo (Spacja)",
     karaoke_undo_button: "Cofnij (Ctrl+Z)",
     karaoke_reset_button: "Resetuj",
+    karaoke_offset_label: "Korekta czasu:",
+    karaoke_offset_minus: "-0.2s",
+    karaoke_offset_plus: "+0.2s",
     karaoke_progress_label: "Postęp synchronizacji:",
 
     karaoke_style_title: "Styl Wizualny i Animacje",

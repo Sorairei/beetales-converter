@@ -20,6 +20,8 @@ import {
   parseLrc,
   parseSrt,
   KaraokeSyncEngine,
+  autoAlignLyricsWithAudio,
+  shiftTimestamps,
 } from "./karaoke-sync.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -135,11 +137,14 @@ const karaokePanelImport = $("#karaoke-panel-import");
 const karaokeLyricsInput = $("#karaoke-lyrics-input");
 const karaokeWordsPerBlock = $("#karaoke-words-per-block");
 const karaokePrepareBtn = $("#karaoke-prepare-btn");
+const karaokeAutoSyncBtn = $("#karaoke-auto-sync-btn");
 const karaokeFileInput = $("#karaoke-file-input");
 const karaokeWordsQueue = $("#karaoke-words-queue");
 const karaokeTapBtn = $("#karaoke-tap-btn");
 const karaokeUndoBtn = $("#karaoke-undo-btn");
 const karaokeResetBtn = $("#karaoke-reset-btn");
+const karaokeOffsetMinus = $("#karaoke-offset-minus");
+const karaokeOffsetPlus = $("#karaoke-offset-plus");
 const karaokeSyncCounter = $("#karaoke-sync-counter");
 const karaokePresetCards = document.querySelectorAll(".karaoke-preset-card");
 const karaokeFontFamily = $("#karaoke-font-family");
@@ -153,6 +158,7 @@ const karaokeDlSrt = $("#karaoke-dl-srt");
 const karaokeDlAss = $("#karaoke-dl-ass");
 const dynamicSubtitleOverlay = $("#dynamic-subtitle-overlay");
 const dynamicSubtitleBox = $("#dynamic-subtitle-box");
+const audioVisualizerCanvas = $("#audio-visualizer-canvas");
 
 const LANG_KEY = "beetales-lang-v1";
 let currentLang = localStorage.getItem(LANG_KEY) || "en";
@@ -311,6 +317,18 @@ videoPreview.addEventListener("timeupdate", () => {
 
 videoPreview.addEventListener("seeked", () => {
   if (getMode() === "karaoke") updateSubtitleOverlay();
+});
+
+videoPreview.addEventListener("play", () => {
+  startVisualizerLoop();
+});
+
+videoPreview.addEventListener("pause", () => {
+  stopVisualizerLoop();
+});
+
+videoPreview.addEventListener("ended", () => {
+  stopVisualizerLoop();
 });
 
 // Initialize sub-modules
@@ -553,11 +571,18 @@ function showPreview(file) {
   previewTitle.textContent = file.name;
   previewMeta.textContent = "Loading details...";
   previewPanel.classList.remove("is-hidden");
+  const isAudio = isAudioFile(file);
+  if (audioVisualizerCanvas) {
+    audioVisualizerCanvas.classList.toggle("is-hidden", !isAudio);
+    if (isAudio) renderAudioVisualizerFrame();
+  }
   if (getMode() !== "audio") saveFrameBar.classList.remove("is-hidden");
   if (getMode() === "karaoke") dynamicSubtitleOverlay.classList.remove("is-hidden");
 }
 
 function resetPreview() {
+  stopVisualizerLoop();
+  if (audioVisualizerCanvas) audioVisualizerCanvas.classList.add("is-hidden");
   videoPreview.pause();
   videoPreview.removeAttribute("src");
   videoPreview.load();
@@ -686,22 +711,44 @@ async function convertFile(file, mode, index, trim) {
 
     let initialArgs;
     if (mode === "karaoke") {
-      initialArgs = [
-        "-hide_banner", "-y",
-        ...getTrimInputArgs(trim),
-        "-i", inputName,
-        ...getTrimDurationArgs(trim),
-        "-vf", `subtitles=${assName}`,
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "22",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        "-f", "mp4",
-        outputName,
-      ];
+      const isAudioOnly = isAudioFile(file);
+      if (isAudioOnly) {
+        initialArgs = [
+          "-hide_banner", "-y",
+          "-f", "lavfi", "-i", "color=c=0x040c06:s=1920x1080:r=30",
+          ...getTrimInputArgs(trim),
+          "-i", inputName,
+          ...getTrimDurationArgs(trim),
+          "-vf", `subtitles=${assName}`,
+          "-c:v", "libx264",
+          "-preset", "veryfast",
+          "-crf", "22",
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-pix_fmt", "yuv420p",
+          "-shortest",
+          "-movflags", "+faststart",
+          "-f", "mp4",
+          outputName,
+        ];
+      } else {
+        initialArgs = [
+          "-hide_banner", "-y",
+          ...getTrimInputArgs(trim),
+          "-i", inputName,
+          ...getTrimDurationArgs(trim),
+          "-vf", `subtitles=${assName}`,
+          "-c:v", "libx264",
+          "-preset", "veryfast",
+          "-crf", "22",
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-pix_fmt", "yuv420p",
+          "-movflags", "+faststart",
+          "-f", "mp4",
+          outputName,
+        ];
+      }
     } else if (mode === "mp4") {
       initialArgs = getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null);
     } else if (mode === "gif") {
@@ -2156,6 +2203,8 @@ function getAtempoChain(speed) {
 // Sprint 5 — Karaoke & Dynamic Subtitles Logic
 // =====================================================================
 
+let visualizerAnimFrame = null;
+
 function initKaraokeStudio() {
   if (!karaokeSettings) return;
 
@@ -2191,7 +2240,71 @@ function initKaraokeStudio() {
       });
       karaokeEngine.setWords(words);
       renderWordChipsQueue();
-      setStatus(`Prepared ${words.length} words for synchronization. Play the video and tap Space!`);
+      setStatus(`Prepared ${words.length} words for synchronization. Play the preview and tap Space, or click Auto-Sync!`);
+    });
+  }
+
+  // Auto-Sync Button (Waveform Energy & Forced Alignment)
+  if (karaokeAutoSyncBtn) {
+    karaokeAutoSyncBtn.addEventListener("click", async () => {
+      const text = (karaokeLyricsInput?.value || "").trim();
+      let words = karaokeEngine.words;
+      if (!words.length) {
+        if (!text) {
+          showError("Please paste your lyrics or script in the box first.");
+          karaokeLyricsInput?.focus();
+          return;
+        }
+        words = splitLyricsIntoWords(text, {
+          wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
+          preserveLineBreaks: true,
+        });
+      }
+
+      clearError();
+      setStatus("⚡ Analyzing audio waveform energy and vocal pauses for auto-synchronization...");
+
+      // 1. Obtain audio data from decoded audioBuffer or decode active file
+      let targetBuffer = audioBuffer;
+      if (!targetBuffer && selectedFiles[0]) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const arrayBuffer = await selectedFiles[0].arrayBuffer();
+          targetBuffer = await ctx.decodeAudioData(arrayBuffer);
+          audioBuffer = targetBuffer;
+        } catch (e) {
+          console.warn("Could not decode audio for auto-sync:", e);
+        }
+      }
+
+      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(selectedFiles[0])?.duration) || 30;
+
+      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration });
+      karaokeEngine.setWords(alignedWords);
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+      setStatus(`⚡ Auto-aligned ${alignedWords.length} words with audio timing! Play preview or adjust with ±0.2s.`);
+    });
+  }
+
+  // Fine Offset Timestamps Buttons (±0.2s)
+  if (karaokeOffsetMinus) {
+    karaokeOffsetMinus.addEventListener("click", () => {
+      if (!karaokeEngine.words.length) return;
+      shiftTimestamps(karaokeEngine.words, -0.2);
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+      setStatus("Shifted timestamps -0.2s earlier.");
+    });
+  }
+
+  if (karaokeOffsetPlus) {
+    karaokeOffsetPlus.addEventListener("click", () => {
+      if (!karaokeEngine.words.length) return;
+      shiftTimestamps(karaokeEngine.words, +0.2);
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+      setStatus("Shifted timestamps +0.2s later.");
     });
   }
 
@@ -2370,18 +2483,23 @@ function renderWordChipsQueue() {
   if (!words.length) {
     const hint = document.createElement("p");
     hint.className = "karaoke-empty-hint";
-    hint.textContent = "Paste lyrics above and click 'Prepare Words for Sync' to start synchronizing.";
+    hint.textContent = "Paste lyrics above and click 'Prepare Words for Sync' or 'Auto-Sync with Audio' to start.";
     karaokeWordsQueue.appendChild(hint);
     if (karaokeTapBtn) karaokeTapBtn.disabled = true;
     if (karaokeUndoBtn) karaokeUndoBtn.disabled = true;
     if (karaokeResetBtn) karaokeResetBtn.disabled = true;
+    if (karaokeOffsetMinus) karaokeOffsetMinus.disabled = true;
+    if (karaokeOffsetPlus) karaokeOffsetPlus.disabled = true;
     if (karaokeSyncCounter) karaokeSyncCounter.textContent = "0 / 0";
     return;
   }
 
+  const hasAnySynced = words.some((w) => w.start !== null);
   if (karaokeTapBtn) karaokeTapBtn.disabled = false;
   if (karaokeUndoBtn) karaokeUndoBtn.disabled = karaokeEngine.currentIndex === 0;
   if (karaokeResetBtn) karaokeResetBtn.disabled = false;
+  if (karaokeOffsetMinus) karaokeOffsetMinus.disabled = !hasAnySynced;
+  if (karaokeOffsetPlus) karaokeOffsetPlus.disabled = !hasAnySynced;
 
   const syncedCount = words.filter((w) => w.start !== null).length;
   if (karaokeSyncCounter) {
@@ -2481,6 +2599,73 @@ function updateSubtitleOverlay() {
 
     dynamicSubtitleBox.appendChild(wordSpan);
   });
+}
+
+// Audio Visualizer for Audio-Only Playback
+function renderAudioVisualizerFrame() {
+  if (!audioVisualizerCanvas || audioVisualizerCanvas.classList.contains("is-hidden")) return;
+  const ctx = audioVisualizerCanvas.getContext("2d");
+  const w = audioVisualizerCanvas.width = audioVisualizerCanvas.clientWidth || 800;
+  const h = audioVisualizerCanvas.height = audioVisualizerCanvas.clientHeight || 450;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Background gradient
+  const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, Math.max(w, h) / 1.5);
+  bgGrad.addColorStop(0, "#092414");
+  bgGrad.addColorStop(0.6, "#040f08");
+  bgGrad.addColorStop(1, "#020703");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const t = (videoPreview.currentTime || 0);
+  const isPlaying = !videoPreview.paused && !videoPreview.ended;
+
+  // Render animated equalizer bars in center
+  const bars = 40;
+  const barWidth = (w * 0.75) / bars;
+  const startX = (w - (bars * barWidth)) / 2;
+  const midY = h / 2;
+
+  for (let i = 0; i < bars; i++) {
+    const wave = isPlaying
+      ? Math.sin(t * 7 + i * 0.45) * Math.cos(t * 4.5 - i * 0.25) * 0.65 + 0.35
+      : 0.08;
+    const barHeight = Math.max(6, Math.abs(wave) * 110);
+    const x = startX + i * barWidth;
+
+    const grad = ctx.createLinearGradient(0, midY - barHeight, 0, midY + barHeight);
+    grad.addColorStop(0, "#6EC832");
+    grad.addColorStop(0.5, "#FFE600");
+    grad.addColorStop(1, "#6EC832");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x + 2, midY - barHeight, barWidth - 4, barHeight * 2, 4);
+    ctx.fill();
+  }
+
+  // Audio track center circuit rings
+  ctx.strokeStyle = isPlaying ? "rgba(110, 200, 50, 0.4)" : "rgba(110, 200, 50, 0.15)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(w / 2, midY, 130 + (isPlaying ? Math.sin(t * 5) * 10 : 0), 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (isPlaying) {
+    visualizerAnimFrame = requestAnimationFrame(renderAudioVisualizerFrame);
+  }
+}
+
+function startVisualizerLoop() {
+  if (visualizerAnimFrame) cancelAnimationFrame(visualizerAnimFrame);
+  renderAudioVisualizerFrame();
+}
+
+function stopVisualizerLoop() {
+  if (visualizerAnimFrame) cancelAnimationFrame(visualizerAnimFrame);
+  visualizerAnimFrame = null;
+  renderAudioVisualizerFrame();
 }
 
 // =====================================================================

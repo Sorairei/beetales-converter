@@ -936,6 +936,32 @@ select:focus-visible {
   color: var(--muted);
 }
 
+.karaoke-auto-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #00FF66 0%, #00B843 100%);
+  border: none;
+  color: #040C06;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.35);
+  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.karaoke-auto-sync-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+  box-shadow: 0 0 18px rgba(0, 255, 102, 0.6);
+}
+
+.karaoke-auto-sync-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
 .karaoke-prepare-btn {
   display: inline-flex;
   align-items: center;
@@ -1106,6 +1132,45 @@ select:focus-visible {
 }
 
 .karaoke-ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.karaoke-offset-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.karaoke-offset-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.karaoke-offset-btn {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  color: var(--text-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.karaoke-offset-btn:not(:disabled):hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.2);
+  color: var(--accent-strong);
+}
+
+.karaoke-offset-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -1311,4 +1376,16 @@ select:focus-visible {
     transform: scale(1.18);
     opacity: 1;
   }
+}
+
+/* Audio Visualizer Canvas for Audio-Only Playback */
+.audio-visualizer-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: radial-gradient(circle at center, #0a1f10 0%, #030804 100%);
+  z-index: 1;
+  border-radius: inherit;
 }

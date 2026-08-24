@@ -175,6 +175,7 @@
             </div>
             <div class="crop-container" id="crop-container">
               <video id="video-preview" controls preload="none"></video>
+              <canvas id="audio-visualizer-canvas" class="audio-visualizer-canvas is-hidden" width="800" height="450"></canvas>
               
               <!-- Dynamic Subtitle Overlay for Real-time Playback -->
               <div class="dynamic-subtitle-overlay is-hidden" id="dynamic-subtitle-overlay" aria-live="off">
@@ -407,6 +408,10 @@
                         <option value="12" data-i18n="karaoke_opt_full">Full lines (Natural)</option>
                       </select>
                     </div>
+                    <button type="button" class="karaoke-auto-sync-btn" id="karaoke-auto-sync-btn" title="Automatically analyze audio to sync all words with 1 click">
+                      <span aria-hidden="true">&#9889;</span>
+                      <span data-i18n="karaoke_auto_sync_button">⚡ Auto-Sync with Audio</span>
+                    </button>
                     <button type="button" class="karaoke-prepare-btn" id="karaoke-prepare-btn">
                       <span aria-hidden="true">&#9881;</span>
                       <span data-i18n="karaoke_parse_button">Prepare Words for Sync</span>
@@ -436,7 +441,7 @@
 
                 <!-- Word chips interactive timeline/queue -->
                 <div class="karaoke-words-queue" id="karaoke-words-queue" role="region" aria-label="Words synchronization queue">
-                  <p class="karaoke-empty-hint">Paste lyrics above and click "Prepare Words for Sync" to start synchronizing.</p>
+                  <p class="karaoke-empty-hint">Paste lyrics above and click "Prepare Words for Sync" or "⚡ Auto-Sync with Audio" to start synchronizing.</p>
                 </div>
 
                 <!-- Live Sync Control Bar -->
@@ -453,6 +458,11 @@
                     <span aria-hidden="true">&#8634;</span>
                     <span data-i18n="karaoke_reset_button">Reset</span>
                   </button>
+                  <div class="karaoke-offset-group">
+                    <span class="karaoke-offset-label" data-i18n="karaoke_offset_label">Shift:</span>
+                    <button type="button" class="karaoke-offset-btn" id="karaoke-offset-minus" title="Shift timestamps earlier by 0.2s" disabled>-0.2s</button>
+                    <button type="button" class="karaoke-offset-btn" id="karaoke-offset-plus" title="Shift timestamps later by 0.2s" disabled>+0.2s</button>
+                  </div>
                   <div class="karaoke-sync-stat">
                     <span data-i18n="karaoke_progress_label">Sync Progress:</span>
                     <strong id="karaoke-sync-counter">0 / 0</strong>

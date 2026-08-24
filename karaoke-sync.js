@@ -568,3 +568,185 @@ export class KaraokeSyncEngine {
     return null;
   }
 }
+
+/**
+ * Counts vowel count in a word for phonetic duration weighting
+ */
+function countVowels(text) {
+  const matches = String(text).match(/[aeiouáéíóúüãõy]/gi);
+  return matches ? matches.length : 1;
+}
+
+/**
+ * Automatically calculates and aligns word timestamps with the audio waveform / voice activity
+ * @param {Array<Object>} words - Array of word objects from splitLyricsIntoWords
+ * @param {AudioBuffer|Object} audioData - Web Audio API AudioBuffer or object with { channelData, sampleRate, duration }
+ * @param {Object} options - Custom tuning parameters
+ * @returns {Array<Object>} Updated words array with populated start and end timestamps
+ */
+export function autoAlignLyricsWithAudio(words, audioData = {}, options = {}) {
+  if (!words || !words.length) return [];
+  const duration = Number(audioData.duration) || 30;
+  if (duration <= 0) return words;
+
+  let vocalSegments = [];
+
+  // 1. Analyze waveform if channel data is available
+  let channel = null;
+  let sampleRate = 44100;
+  if (audioData.getChannelData) {
+    try {
+      channel = audioData.getChannelData(0);
+      sampleRate = audioData.sampleRate || 44100;
+    } catch {}
+  } else if (audioData.channelData && audioData.channelData instanceof Float32Array) {
+    channel = audioData.channelData;
+    sampleRate = audioData.sampleRate || 44100;
+  }
+
+  if (channel && channel.length > 0) {
+    const frameSize = Math.max(256, Math.floor(sampleRate * 0.04)); // 40ms frame
+    const totalFrames = Math.floor(channel.length / frameSize);
+    const energies = new Float32Array(totalFrames);
+
+    let maxEnergy = 0;
+    let avgEnergy = 0;
+
+    for (let f = 0; f < totalFrames; f++) {
+      let sumSq = 0;
+      const offset = f * frameSize;
+      for (let i = 0; i < frameSize; i++) {
+        const val = channel[offset + i];
+        sumSq += val * val;
+      }
+      const rms = Math.sqrt(sumSq / frameSize);
+      energies[f] = rms;
+      if (rms > maxEnergy) maxEnergy = rms;
+      avgEnergy += rms;
+    }
+    avgEnergy /= (totalFrames || 1);
+
+    // Adaptive threshold for vocal presence
+    const threshold = Math.max(0.008, avgEnergy * 0.85);
+
+    let inVocal = false;
+    let segStart = 0;
+    const minSegFrames = Math.floor(0.25 / 0.04);
+    const maxSilenceFrames = Math.floor(0.40 / 0.04);
+    let silenceCount = 0;
+
+    for (let f = 0; f < totalFrames; f++) {
+      const isVoice = energies[f] >= threshold;
+      const timeSec = (f * frameSize) / sampleRate;
+
+      if (isVoice) {
+        if (!inVocal) {
+          inVocal = true;
+          segStart = timeSec;
+        }
+        silenceCount = 0;
+      } else {
+        if (inVocal) {
+          silenceCount++;
+          if (silenceCount > maxSilenceFrames || f === totalFrames - 1) {
+            const segEnd = timeSec - (silenceCount * 0.04);
+            if (segEnd - segStart >= 0.2) {
+              vocalSegments.push({ start: Math.max(0, segStart), end: Math.min(duration, segEnd) });
+            }
+            inVocal = false;
+            silenceCount = 0;
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: If no distinct voice segments were found, create a uniform span
+  if (!vocalSegments.length) {
+    const leadIn = Math.min(1.0, duration * 0.05);
+    const leadOut = Math.max(0.5, duration * 0.05);
+    vocalSegments = [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
+  }
+
+  // 2. Group words by line or block for natural phrasing
+  const blocksMap = new Map();
+  words.forEach((w) => {
+    const bIdx = w.blockIndex !== undefined ? w.blockIndex : 0;
+    if (!blocksMap.has(bIdx)) blocksMap.set(bIdx, []);
+    blocksMap.get(bIdx).push(w);
+  });
+
+  const blockGroups = Array.from(blocksMap.values());
+
+  // 3. Map word blocks across vocal segments
+  const totalActiveDuration = vocalSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+
+  // Compute weight for each block based on total syllables/characters
+  const blockWeights = blockGroups.map((group) => {
+    return group.reduce((sum, w) => {
+      const len = (w.text || "").length;
+      const vowels = countVowels(w.text);
+      return sum + len + vowels * 1.5;
+    }, 0);
+  });
+
+  const sumBlockWeights = blockWeights.reduce((a, b) => a + b, 0) || 1;
+
+  let currentSegIdx = 0;
+  let currentSegOffset = vocalSegments[0].start;
+
+  blockGroups.forEach((group, bIdx) => {
+    const bWeight = blockWeights[bIdx];
+    const blockDuration = Math.max(0.6, (bWeight / sumBlockWeights) * totalActiveDuration);
+
+    let seg = vocalSegments[currentSegIdx];
+    if (!seg) {
+      seg = vocalSegments[vocalSegments.length - 1];
+    }
+
+    let bStart = currentSegOffset;
+    let bEnd = bStart + blockDuration;
+
+    // Advance to next segment if overflowing
+    if (bEnd > seg.end && currentSegIdx < vocalSegments.length - 1) {
+      currentSegIdx++;
+      seg = vocalSegments[currentSegIdx];
+      bStart = seg.start;
+      bEnd = bStart + blockDuration;
+    }
+
+    currentSegOffset = bEnd + 0.15; // Small pause between blocks
+
+    // Distribute individual words inside block
+    const wordWeights = group.map((w) => (w.text || "").length + countVowels(w.text) * 1.5);
+    const sumWordWeights = wordWeights.reduce((a, b) => a + b, 0) || 1;
+    const blockSpan = Math.max(0.4, bEnd - bStart);
+
+    let wCursor = bStart;
+    group.forEach((w, wIdx) => {
+      const wDur = Math.max(0.12, (wordWeights[wIdx] / sumWordWeights) * blockSpan);
+      w.start = Number(wCursor.toFixed(2));
+      w.end = Number((wCursor + wDur).toFixed(2));
+      wCursor += wDur;
+    });
+  });
+
+  return words;
+}
+
+/**
+ * Shifts all synced word timestamps by a given offset in seconds
+ * @param {Array<Object>} words
+ * @param {number} offsetSeconds
+ */
+export function shiftTimestamps(words, offsetSeconds) {
+  if (!words || !words.length || !offsetSeconds) return;
+  words.forEach((w) => {
+    if (w.start !== null) {
+      w.start = Math.max(0, Number((w.start + offsetSeconds).toFixed(2)));
+    }
+    if (w.end !== null) {
+      w.end = Math.max(w.start + 0.05, Number((w.end + offsetSeconds).toFixed(2)));
+    }
+  });
+}

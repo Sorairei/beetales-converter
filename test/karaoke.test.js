@@ -13,6 +13,8 @@ import {
   parseSrt,
   KaraokeSyncEngine,
   SUBTITLE_PRESETS,
+  autoAlignLyricsWithAudio,
+  shiftTimestamps,
 } from "../karaoke-sync.js";
 
 test("splitLyricsIntoWords divides text into structured word objects with blocks", () => {
@@ -123,4 +125,39 @@ test("exportLrc and parseLrc handle karaoke timestamp formats", () => {
   const parsed = parseLrc(lrc);
   assert.ok(parsed.length >= 2);
   assert.equal(parsed[0].text, "Sing");
+});
+
+test("autoAlignLyricsWithAudio computes valid timestamps for words based on audio duration", () => {
+  const words = splitLyricsIntoWords("I wanna sing a song for you today", { wordsPerBlock: 3 });
+  assert.equal(words.every((w) => w.start === null), true);
+
+  // Fake audio waveform buffer
+  const sampleRate = 44100;
+  const duration = 10;
+  const channelData = new Float32Array(sampleRate * duration);
+  // Add some signal in seconds 1.0 to 9.0
+  for (let i = sampleRate * 1; i < sampleRate * 9; i++) {
+    channelData[i] = Math.sin(i / 10) * 0.5;
+  }
+
+  const aligned = autoAlignLyricsWithAudio(words, { channelData, sampleRate, duration });
+  assert.equal(aligned.length, words.length);
+  assert.ok(aligned.every((w) => w.start !== null && w.end !== null && w.end > w.start));
+  assert.ok(aligned[0].start >= 0);
+  assert.ok(aligned[aligned.length - 1].end <= duration);
+});
+
+test("shiftTimestamps nudges all word timings forward or backward", () => {
+  const words = [
+    { id: 0, text: "Hello", start: 1.0, end: 2.0 },
+    { id: 1, text: "World", start: 2.0, end: 3.0 },
+  ];
+
+  shiftTimestamps(words, 0.5);
+  assert.equal(words[0].start, 1.5);
+  assert.equal(words[0].end, 2.5);
+
+  shiftTimestamps(words, -0.3);
+  assert.equal(words[0].start, 1.2);
+  assert.equal(words[0].end, 2.2);
 });

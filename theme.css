@@ -796,5 +796,60 @@ select:focus-visible {
   color: var(--accent-strong);
 }
 
+/* --------------------------------------------------------------------------
+   Sprint 4 — Language Selector & Guide Modal Theme
+   -------------------------------------------------------------------------- */
+
+.user-utilities-bar {
+  border-color: rgba(74, 138, 40, 0.4);
+  background:
+    radial-gradient(circle at 10% 20%, rgba(110, 200, 50, 0.08), transparent 45%),
+    rgba(13, 30, 16, 0.95);
+}
+
+.language-select {
+  border-color: rgba(74, 138, 40, 0.5);
+  background: var(--panel-soft);
+  color: var(--text-strong);
+}
+
+.guide-toggle-button {
+  border-color: rgba(245, 166, 35, 0.4);
+  background: rgba(245, 166, 35, 0.08);
+  color: var(--amber-strong);
+}
+
+.guide-toggle-button:hover {
+  border-color: var(--amber-strong);
+  background: rgba(245, 166, 35, 0.16);
+  box-shadow: 0 0 12px rgba(245, 166, 35, 0.2);
+}
+
+.guide-dialog {
+  border-color: rgba(74, 138, 40, 0.65);
+  background: var(--panel);
+  box-shadow: 0 26px 80px rgba(0, 8, 2, 0.85);
+}
+
+.guide-header,
+.guide-footer {
+  border-color: rgba(42, 80, 48, 0.65);
+  background: var(--panel-strong);
+}
+
+.guide-card,
+.guide-item-block,
+.guide-feature-list li {
+  border-color: rgba(42, 80, 48, 0.55);
+  background: rgba(13, 30, 16, 0.65);
+}
+
+.guide-tab-button.is-active {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.15);
+  color: var(--accent-strong);
+}
+
+
 
 

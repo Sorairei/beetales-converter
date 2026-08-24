@@ -10,6 +10,7 @@ import {
   parseTimeValue,
   safeBaseName,
 } from "./converter-utils.js";
+import { translations } from "./translations.js";
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#converter-form");
@@ -104,6 +105,18 @@ const historyClear = $("#history-clear");
 const historyList = $("#history-list");
 const historyStatsSubtitle = $("#history-stats-subtitle");
 const historyBadge = $("#history-badge");
+
+const languageSelect = $("#language-select");
+const guideToggle = $("#guide-toggle");
+const guideModal = $("#guide-modal");
+const guideBackdrop = $("#guide-backdrop");
+const guideClose = $("#guide-close");
+const guideCloseBtn = $("#guide-close-btn");
+const guideTabs = document.querySelectorAll(".guide-tab-button");
+const guidePanes = document.querySelectorAll(".guide-pane");
+
+const LANG_KEY = "beetales-lang-v1";
+let currentLang = localStorage.getItem(LANG_KEY) || "en";
 
 let selectedSubtitlesFile = null;
 let selectedExternalAudioFile = null;
@@ -220,6 +233,7 @@ videoPreview.addEventListener("timeupdate", () => {
 });
 restorePreferences();
 applyUrlParams();
+setLanguage(currentLang);
 updateModeUI({ resetFiles: false });
 renderPresets();
 updateHistoryBadge();
@@ -1968,3 +1982,80 @@ function getAtempoChain(speed) {
   filters.push(`atempo=${s.toFixed(6)}`);
   return filters.join(",");
 }
+
+// =====================================================================
+// Sprint 4 — i18n & User Guide Modal
+// =====================================================================
+
+function setLanguage(lang) {
+  if (!translations[lang]) lang = "en";
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  if (languageSelect) languageSelect.value = lang;
+  try { localStorage.setItem(LANG_KEY, lang); } catch {}
+
+  const dict = translations[lang];
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.dataset.i18n;
+    if (dict[key]) {
+      el.textContent = dict[key];
+    }
+  });
+
+  if (presetNameInput) presetNameInput.placeholder = dict.preset_name_placeholder || "Preset name…";
+
+  updateLocalizedModeContent();
+  updateHistoryBadge();
+  renderPresets();
+}
+
+function updateLocalizedModeContent() {
+  const dict = translations[currentLang] || translations.en;
+  if (modeContent.audio) {
+    modeContent.audio.button = dict.btn_convert_audio || "Convert to audio";
+    modeContent.audio.empty = dict.status_ready || "Choose a video to get started.";
+    modeContent.audio.dropTitle = dict.drop_title || "Select one or more video files";
+    modeContent.audio.dropHint = dict.drop_hint || "You can also drag and drop them here";
+  }
+  if (modeContent.mp4) {
+    modeContent.mp4.button = dict.btn_convert_mp4 || "Convert to MP4";
+    modeContent.mp4.empty = dict.status_ready || "Choose a video to get started.";
+  }
+  if (modeContent.gif) {
+    modeContent.gif.button = dict.btn_convert_gif || "Convert to GIF";
+    modeContent.gif.empty = dict.status_ready || "Choose a video to get started.";
+  }
+}
+
+function openGuideModal() {
+  if (guideModal) guideModal.classList.remove("is-hidden");
+}
+
+function closeGuideModal() {
+  if (guideModal) guideModal.classList.add("is-hidden");
+}
+
+if (languageSelect) {
+  languageSelect.addEventListener("change", (e) => {
+    setLanguage(e.target.value);
+  });
+}
+
+if (guideToggle) guideToggle.addEventListener("click", openGuideModal);
+if (guideClose) guideClose.addEventListener("click", closeGuideModal);
+if (guideCloseBtn) guideCloseBtn.addEventListener("click", closeGuideModal);
+if (guideBackdrop) guideBackdrop.addEventListener("click", closeGuideModal);
+
+guideTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    guideTabs.forEach((t) => {
+      t.classList.remove("is-active");
+      t.setAttribute("aria-selected", "false");
+    });
+    guidePanes.forEach((p) => p.classList.remove("is-active"));
+    tab.classList.add("is-active");
+    tab.setAttribute("aria-selected", "true");
+    const targetPane = document.getElementById(`pane-${tab.dataset.tab}`);
+    if (targetPane) targetPane.classList.add("is-active");
+  });
+});

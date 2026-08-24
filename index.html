@@ -12,8 +12,8 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-sprint3" />
-    <link rel="stylesheet" href="theme.css?v=20260823-sprint3" />
+    <link rel="stylesheet" href="style.css?v=20260823-sprint4-i18n" />
+    <link rel="stylesheet" href="theme.css?v=20260823-sprint4-i18n" />
   </head>
   <body>
     <main class="app-shell">
@@ -50,6 +50,25 @@
             <span>MP4</span>
             <span>GIF</span>
           </div>
+
+          <!-- Language Selector & User Guide Bar -->
+          <div class="user-utilities-bar">
+            <div class="language-picker">
+              <span class="lang-icon" aria-hidden="true">🌐</span>
+              <label for="language-select" class="sr-only">Language</label>
+              <select id="language-select" class="language-select" aria-label="Language selector">
+                <option value="en" selected>English (EN)</option>
+                <option value="es">Español (ES)</option>
+                <option value="pt">Português (PT)</option>
+                <option value="pl">Polski (PL)</option>
+              </select>
+            </div>
+            <button class="guide-toggle-button" id="guide-toggle" type="button" aria-haspopup="dialog">
+              <span aria-hidden="true">📖</span>
+              <span data-i18n="nav_user_guide">User Guide & Help</span>
+            </button>
+          </div>
+
           <div class="privacy-note" role="note">
             <img
               class="privacy-mascot"
@@ -59,16 +78,16 @@
               height="1024"
             />
             <div>
-              <strong>Private by design</strong>
-              <p>Your files never leave this device. No uploads, accounts, or document server.</p>
+              <strong data-i18n="privacy_title">Private by design</strong>
+              <p data-i18n="privacy_desc">Your files never leave this device. No uploads, accounts, or document server.</p>
               <ul aria-label="Privacy benefits">
-                <li>100% local</li>
-                <li>No registration</li>
-                <li>Browser only</li>
+                <li data-i18n="privacy_b1">100% local</li>
+                <li data-i18n="privacy_b2">No registration</li>
+                <li data-i18n="privacy_b3">Browser only</li>
               </ul>
               <a class="sponsor-button" href="https://github.com/sponsors/Sorairei" target="_blank" rel="noopener noreferrer">
                 <span aria-hidden="true">&#9829;</span>
-                Sponsor on GitHub
+                <span data-i18n="sponsor_github">Sponsor on GitHub</span>
               </a>
             </div>
           </div>
@@ -76,27 +95,27 @@
 
         <form class="converter-panel" id="converter-form">
           <fieldset class="mode-fieldset">
-            <legend>Conversion mode</legend>
+            <legend data-i18n="mode_legend">Conversion mode</legend>
             <div class="mode-control">
               <label>
                 <input type="radio" name="mode" value="audio" checked />
                 <span>
-                  <strong>Extract audio</strong>
-                  <small>Video to MP3, WAV, or AAC</small>
+                  <strong data-i18n="mode_audio_title">Extract audio</strong>
+                  <small data-i18n="mode_audio_desc">Video to MP3, WAV, or AAC</small>
                 </span>
               </label>
               <label>
                 <input type="radio" name="mode" value="mp4" />
                 <span>
-                  <strong>Convert or optimize MP4</strong>
-                  <small>WebM/MP4 to resized, trimmed, or compressed MP4</small>
+                  <strong data-i18n="mode_mp4_title">Convert or optimize MP4</strong>
+                  <small data-i18n="mode_mp4_desc">WebM/MP4 to resized, trimmed, or compressed MP4</small>
                 </span>
               </label>
               <label>
                 <input type="radio" name="mode" value="gif" />
                 <span>
-                  <strong>Video to GIF</strong>
-                  <small>Create a short animated GIF with trim and crop options</small>
+                  <strong data-i18n="mode_gif_title">Video to GIF</strong>
+                  <small data-i18n="mode_gif_desc">Create a short animated GIF with trim and crop options</small>
                 </span>
               </label>
             </div>
@@ -431,7 +450,7 @@
       <div class="history-dialog">
         <div class="history-header">
           <div>
-            <h3 id="history-title">Conversion History & Space Savings</h3>
+            <h3 id="history-title" data-i18n="history_title">Conversion History & Space Savings</h3>
             <p class="history-stats-subtitle" id="history-stats-subtitle">No conversions yet in this session.</p>
           </div>
           <button class="history-close-button" id="history-close" type="button" aria-label="Close history">✕</button>
@@ -440,7 +459,111 @@
           <div class="history-list" id="history-list"></div>
         </div>
         <div class="history-footer">
-          <button class="history-clear-button" id="history-clear" type="button">Clear history</button>
+          <button class="history-clear-button" id="history-clear" type="button" data-i18n="clear_history">Clear history</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Guide & Help Modal -->
+    <div class="guide-modal is-hidden" id="guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-modal-title">
+      <div class="guide-backdrop" id="guide-backdrop"></div>
+      <div class="guide-dialog">
+        <div class="guide-header">
+          <div>
+            <h2 id="guide-modal-title" data-i18n="guide_title">BeeTales Converter — User Guide & Manual</h2>
+            <p class="guide-subtitle" data-i18n="guide_subtitle">Everything you need to know about all features and tools</p>
+          </div>
+          <button class="guide-close-button" id="guide-close" type="button" aria-label="Close guide">✕</button>
+        </div>
+
+        <div class="guide-nav-tabs" role="tablist" aria-label="Guide topics">
+          <button class="guide-tab-button is-active" data-tab="overview" type="button" role="tab" aria-selected="true" data-i18n="guide_tab_overview">🌟 Overview</button>
+          <button class="guide-tab-button" data-tab="modes" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_modes">🎬 Formats & Modes</button>
+          <button class="guide-tab-button" data-tab="audio" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_audio">🔊 Audio & Loudness</button>
+          <button class="guide-tab-button" data-tab="video" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_video">⚡ Video & Subtitles</button>
+          <button class="guide-tab-button" data-tab="privacy" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_privacy">🛡️ 100% Local Privacy</button>
+        </div>
+
+        <div class="guide-content-body">
+          <!-- Overview Tab -->
+          <div class="guide-pane is-active" id="pane-overview" role="tabpanel">
+            <h3 data-i18n="guide_sec_intro_title">Welcome to BeeTales Media Converter</h3>
+            <p data-i18n="guide_sec_intro_p">BeeTales is an open-source, local-first media workstation that converts video and audio directly inside your web browser. Powered by WebAssembly (FFmpeg), your files never leave your computer—no servers, no document uploads, and no subscription fees.</p>
+            <div class="guide-quick-cards">
+              <div class="guide-card">
+                <h4>🚀 Quick Workflow</h4>
+                <ol>
+                  <li>Choose your <strong>Conversion Mode</strong> (Audio, MP4, or GIF).</li>
+                  <li>Drag and drop your video files into the dropzone.</li>
+                  <li>Customize settings (Quality, Loudness, Speed, Subtitles).</li>
+                  <li>Click <strong>Convert</strong> and download your files.</li>
+                </ol>
+              </div>
+              <div class="guide-card">
+                <h4>🎛️ Saved Presets & Share Links</h4>
+                <p>Save your favorite configuration with the <strong>Save preset</strong> button or click <strong>Share link</strong> to copy a direct URL containing your active settings.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modes Tab -->
+          <div class="guide-pane" id="pane-modes" role="tabpanel">
+            <h3 data-i18n="guide_sec_modes_h3">Conversion Modes Explained</h3>
+            <div class="guide-item-block">
+              <h4 data-i18n="mode_audio_title">Extract audio</h4>
+              <p data-i18n="guide_sec_modes_audio">• Extract Audio (MP3 / WAV / AAC): Extracts the sound track from video clips at customizable bitrates (128k, 192k, 320k) or uncompressed WAV.</p>
+            </div>
+            <div class="guide-item-block">
+              <h4 data-i18n="mode_mp4_title">Convert or optimize MP4</h4>
+              <p data-i18n="guide_sec_modes_mp4">• Convert & Optimize MP4: Re-encodes WebM and video files to universal MP4 (H.264 / AAC) with customizable quality (CRF), resolution scaling (1080p, 720p, 480p), and speed.</p>
+            </div>
+            <div class="guide-item-block">
+              <h4 data-i18n="mode_gif_title">Video to GIF</h4>
+              <p data-i18n="guide_sec_modes_gif">• Video to GIF / WebP: Generates ultra-smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.</p>
+            </div>
+          </div>
+
+          <!-- Audio Tab -->
+          <div class="guide-pane" id="pane-audio" role="tabpanel">
+            <h3 data-i18n="guide_sec_loudness_h3">EBU R128 Loudness Normalization</h3>
+            <p data-i18n="guide_sec_loudness_p">EBU R128 (Loudness Normalization) is the broadcast and streaming standard used by Spotify, YouTube, Apple Music, and Netflix. When enabled, it balances the volume across different clips, preventing quiet audio or sudden jarring loud peaks without introducing distortion.</p>
+            <div class="guide-card">
+              <h4>🎯 Recommended Uses</h4>
+              <ul>
+                <li><strong>Podcasts & Voice Notes</strong>: Ensures speech is clearly intelligible.</li>
+                <li><strong>Music & Video Soundtracks</strong>: Levels sound for comfortable listening without manual volume adjustments.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Video Tab -->
+          <div class="guide-pane" id="pane-video" role="tabpanel">
+            <h3 data-i18n="guide_sec_features_h3">Advanced Video Tools</h3>
+            <ul class="guide-feature-list">
+              <li data-i18n="guide_sec_speed">• Speed Control: Slow down video (0.25×, 0.5×, 0.75×) or speed it up (1.5×, 2×) with automatic audio pitch and tempo synchronization.</li>
+              <li data-i18n="guide_sec_subs">• Subtitle Burn-In (.srt / .vtt): Hardcodes subtitles directly into the video stream with styled borders and crisp readability.</li>
+              <li data-i18n="guide_sec_audio_replace">• Replace Audio Track: Lets you add a custom music track (.mp3, .wav) to mute the background noise or create music videos.</li>
+              <li data-i18n="guide_sec_color">• Color & Style Filters: Apply quick contrast, vivid saturation, black & white, or cinematic warm grading with zero rendering lag.</li>
+              <li data-i18n="guide_sec_save_frame">• Save Frame (JPEG): Instantly snapshot the current frame at full resolution without waiting for video processing.</li>
+            </ul>
+          </div>
+
+          <!-- Privacy Tab -->
+          <div class="guide-pane" id="pane-privacy" role="tabpanel">
+            <h3 data-i18n="guide_sec_privacy_h3">How Local Privacy Works</h3>
+            <p data-i18n="guide_sec_privacy_p">Unlike typical online converters that upload your confidential video clips to remote cloud servers, BeeTales executes a compiled C/C++ FFmpeg engine inside a WebAssembly sandbox in your browser. All computations happen in local RAM, making it safe for private footage, copyrighted materials, and offline work.</p>
+            <div class="guide-card">
+              <h4>🔒 Security Guarantees</h4>
+              <ul>
+                <li><strong>Zero Telemetry on Files</strong>: No files or filenames are ever transmitted to any third-party server.</li>
+                <li><strong>Works Offline</strong>: Once loaded, conversions continue to function even without an active internet connection.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-footer">
+          <button class="guide-close-primary" id="guide-close-btn" type="button">Got it!</button>
         </div>
       </div>
     </div>

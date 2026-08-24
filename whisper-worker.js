@@ -55,9 +55,9 @@ self.addEventListener("message", async (event) => {
 
       const targetLanguage = options?.language || "spanish";
 
-      // Execute speech-to-text with word-level timestamps in background thread
+      // Execute speech-to-text with segment timestamps (fast, reliable, and lightweight)
       const output = await transcriber(data, {
-        return_timestamps: "word",
+        return_timestamps: true,
         chunk_length_s: 30,
         stride_length_s: 5,
         language: targetLanguage,

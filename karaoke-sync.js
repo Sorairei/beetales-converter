@@ -1580,7 +1580,7 @@ export async function transcribeWithWhisperAI(audioData, options = {}, onProgres
   return new Promise((resolve, reject) => {
     let worker;
     try {
-      worker = new Worker(new URL("./whisper-worker.js", import.meta.url), { type: "module" });
+      worker = new Worker(new URL("./whisper-worker.js?v=20260824v3", import.meta.url), { type: "module" });
     } catch (workerErr) {
       // Inline Blob worker fallback if external module worker URL is restricted
       const workerCode = `
@@ -1605,10 +1605,10 @@ export async function transcribeWithWhisperAI(audioData, options = {}, onProgres
               }
               self.postMessage({ type: "progress", status: "transcribing" });
               const out = await instance(e.data.data, {
-                return_timestamps: "word",
+                return_timestamps: true,
                 chunk_length_s: 30,
                 stride_length_s: 5,
-                language: e.data.options?.language || null,
+                language: e.data.options?.language || "spanish",
                 task: "transcribe"
               });
               self.postMessage({ type: "complete", chunks: out?.chunks || [] });

@@ -5,7 +5,7 @@
 <h1 align="center">BeeTales Media Converter</h1>
 
 <p align="center">
-  A private, open-source media converter that runs entirely in the browser.
+  A private, ultra-fast, open-source media workstation that runs 100% locally in your web browser.
 </p>
 
 <p align="center">
@@ -20,6 +20,7 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2d744a.svg"></a>
   <img alt="100% local processing" src="https://img.shields.io/badge/processing-100%25%20local-2d744a.svg">
   <img alt="Powered by ffmpeg.wasm" src="https://img.shields.io/badge/runtime-ffmpeg.wasm-d99a2b.svg">
+  <img alt="Multi-language EN ES PT PL" src="https://img.shields.io/badge/i18n-EN%20|%20ES%20|%20PT%20|%20PL-0ea5e9.svg">
   <a href="https://github.com/sponsors/Sorairei"><img alt="GitHub Sponsors" src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-bf3989.svg?logo=githubsponsors&logoColor=white"></a>
 </p>
 
@@ -29,287 +30,253 @@
 
 ## Overview
 
-BeeTales Media Converter extracts audio, converts or optimizes MP4 video, and creates animated GIF clips without uploading source files. Conversion happens inside the user's browser with the locally bundled ffmpeg.wasm runtime.
+**BeeTales Media Converter** is an open-source, local-first media powerhouse designed to extract high-bitrate audio, convert and optimize MP4 video, burn subtitles, normalize loudness, grade colors, and generate animated GIF/WebP clips—all executed inside your browser without uploading a single byte to external servers.
 
-The application is made from static HTML, CSS, JavaScript, images, and WebAssembly files. It requires no backend, database, account, cloud conversion service, cookies, analytics, API keys, or private endpoints.
+Powered by a compiled WebAssembly (FFmpeg) engine, it provides studio-grade conversion tools directly on your device with zero backend dependencies, zero subscriptions, zero cookies, and complete offline capability once loaded.
+
+---
 
 ## Contents
 
-- [Highlights](#highlights)
-- [Conversion modes](#conversion-modes)
-- [How it works](#how-it-works)
-- [Privacy and security](#privacy-and-security)
+- [Key Features](#key-features)
+- [Conversion Modes & Capabilities](#conversion-modes--capabilities)
+- [Advanced Video & Audio Tools](#advanced-video--audio-tools)
+- [Multi-Language & User Guide](#multi-language--user-guide)
+- [History & Space Savings Calculator](#history--space-savings-calculator)
+- [Presets & Shareable Links](#presets--shareable-links)
+- [How It Works](#how-it-works)
+- [Privacy & Security Guarantees](#privacy--security-guarantees)
 - [Architecture](#architecture)
-- [Conversion behavior](#conversion-behavior)
-- [Repository structure](#repository-structure)
-- [Local development](#local-development)
-- [Deployment](#deployment)
-- [Quality and validation](#quality-and-validation)
-- [Limitations](#limitations)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [Sponsorship](#sponsorship)
+- [Repository Structure](#repository-structure)
+- [Local Development & Deployment](#local-development--deployment)
+- [Quality & Automated Tests](#quality--automated-tests)
+- [Contributing & Sponsorship](#contributing--sponsorship)
 - [License](#license)
 
-## Highlights
+---
+
+## Key Features
 
 | Area | Capabilities |
 | --- | --- |
-| Local processing | Files remain on the device and are processed by ffmpeg.wasm in the browser |
-| Audio | MP3, WAV, and AAC output with 128k, 192k, or 320k bitrate options |
-| MP4 | WebM-to-MP4 conversion and MP4 optimization with quality and resolution controls |
-| GIF | Animated GIF or WebP clips at 320, 480, or 640 pixels and 8, 12, or 15 FPS with optional area crop |
-| Editing | Optional trimming with `MM:SS` or `HH:MM:SS` start and end values |
-| Batch workflow | Multi-file queue, per-file state, overall progress, cancellation, and batch download |
-| Preview | Local video preview with metadata bar, frame-by-frame navigation, thumbnail timeline, and before/after file sizes |
-| Audio tools | Waveform visualization for identifying sections of interest before extraction |
-| Preferences | Last-used mode and output settings are remembered in `localStorage` |
-| Resource safety | GIF duration limits, validated trim ranges, sequential processing, and worker cleanup |
-| Interface | Responsive English UI with the nocturnal BeeTales swamp identity |
+| **100% Local Processing** | Files never leave your computer. All processing executes in browser memory via WebAssembly. |
+| **Multi-Language (i18n)** | Full dynamic localization in **English (EN)**, **Español (ES)**, **Português (PT)**, and **Polski (PL)**. |
+| **Interactive User Manual** | Built-in modal documentation guide explaining all features, loudness standards, and conversion modes. |
+| **Audio Extraction** | High-fidelity MP3, WAV, and AAC export at 128k, 192k, or 320k bitrates with real-time waveform inspection. |
+| **Loudness Normalization** | Industry-standard **EBU R128** normalization (Spotify, YouTube, Netflix standard) for balanced audio levels. |
+| **Universal MP4 Engine** | WebM-to-MP4 transcoding, resolution scaling (1080p, 720p, 480p), CRF quality tuning, and fast-start streaming. |
+| **Speed Control** | Variable video playback speed (**0.25× to 2×**) with automatic pitch and tempo audio synchronization (`atempo`). |
+| **Color Grading Filters** | Instant color styling presets (**Vivid**, **High Contrast**, **Black & White**, **Cinematic Warm**). |
+| **Audio Track Management** | Flexible channel routing (**Stereo**, **Mono downmix**, or **Full Mute**). |
+| **Subtitles & Custom Audio** | Hardcode `.srt`/`.vtt` subtitles with styled borders or replace video audio tracks with custom music files. |
+| **GIF & WebP Animation** | Two-pass palette-optimized animated GIFs or modern WebP clips with interactive visual area cropping. |
+| **Frame Snapshot** | One-click **Save frame** button to export current video frame as high-resolution JPEG. |
+| **Drag & Drop Queue** | Multi-file batch queue with native drag-and-drop reordering handles (`⋮⋮`). |
+| **Conversion History** | Session history tracking input vs output sizes, compression percentages, and net space saved. |
+| **Presets & URL Sharing** | Save configurations to `localStorage` or share direct settings via hash-encoded URLs. |
 
-## Conversion modes
+---
 
-| Mode | Accepted input | Output | Main controls |
-| --- | --- | --- | --- |
-| Extract audio | Common video formats including MP4, MOV, MKV, and WebM | MP3, WAV, or AAC | Format, bitrate, and trim range |
-| Convert or optimize MP4 | WebM and MP4 | MP4 | Quality preset, target resolution, and trim range |
-| Video to GIF/WebP | Compatible browser video files | Animated GIF or WebP | Width, frame rate, trim range, and visual crop selection |
-
-MP4 output supports smaller, balanced, and high-quality presets together with original, 1080p, 720p, and 480p resolution choices. GIF clips are limited to 15 seconds to protect browser memory. The GIF mode includes a visual crop tool that lets users select a specific area of the video frame before conversion, and a WebP output option for smaller file sizes with modern compression.
-
-## How it works
-
-1. The user selects or drops one or more local video files.
-2. The browser validates the files and reads available duration and resolution metadata.
-3. The application builds a removable queue and validates the shared trim range.
-4. ffmpeg.wasm loads from the committed `vendor/ffmpeg` directory.
-5. Queue items are written to ffmpeg's in-browser virtual filesystem and converted sequentially.
-6. Each completed output becomes a temporary browser `Blob` with its own download action.
-7. Temporary files are deleted and the ffmpeg worker is released after the queue finishes.
-
-The queue and conversion controls are locked while a batch is running so every item uses a consistent configuration. Cancelling stops the active worker while preserving downloads that already completed.
-
-## Privacy and security
-
-| Concern | Behavior |
-| --- | --- |
-| Source media | Read from the user's device and never uploaded by the application |
-| Converted files | Created as temporary in-memory browser objects |
-| Preferences | Stored locally in `localStorage`; no media content is included |
-| Accounts and authentication | Not used |
-| Cookies and analytics | Not included |
-| Backend and database | Not required |
-| Third-party conversion APIs | Not used |
-| Runtime assets | ffmpeg.wasm, branding, fonts, and interface assets are served locally |
-
-Generated object URLs exist only for the active page session. Reloading or closing the page releases those temporary downloads, so completed files should be saved before leaving the application.
-
-## Architecture
+## Conversion Modes & Capabilities
 
 ```mermaid
-flowchart LR
-    FILES[Local media files] --> VALIDATE[Browser validation and metadata]
-    VALIDATE --> QUEUE[Conversion queue]
-    SETTINGS[Mode, quality, trim, and format] --> QUEUE
-    QUEUE --> FFMPEG[Local ffmpeg.wasm worker]
-    FFMPEG --> BLOBS[Temporary output Blobs]
-    BLOBS --> DOWNLOADS[Individual or batch downloads]
-    SETTINGS <--> STORAGE[localStorage preferences]
+graph TD
+    A[Input Video Files] --> B{Choose Conversion Mode}
+    B -->|Audio Mode| C[Extract Audio: MP3 / WAV / AAC + EBU R128]
+    B -->|MP4 Mode| D[MP4 Transcoder: CRF Quality + Scaling + Speed + Filters + Subs]
+    B -->|GIF Mode| E[Video to GIF / WebP: Palette Optimization + Area Crop]
 ```
 
-### Design boundaries
+### 1. Extract Audio
+- **Supported Formats**: MP3 (128k, 192k, 320k), uncompressed WAV, and AAC.
+- **Waveform Analysis**: Decodes audio with the Web Audio API to render visual waveforms for pinpointing audio peaks and silence.
+- **Loudness Normalization**: EBU R128 filter ensures even volume levels across voice notes, interviews, and music.
 
-- **Interface layer:** `index.html`, `style.css`, and `theme.css` define the responsive converter and BeeTales visual identity.
-- **Application layer:** `app.js` owns queue state, previews, validation, ffmpeg lifecycle, progress, cancellation, and downloads.
-- **Utility layer:** `converter-utils.js` contains deterministic time, filename, trim-argument, crop-filter, and formatting helpers.
-- **Runtime layer:** `vendor/ffmpeg` contains the browser modules, worker code, and WebAssembly core required for conversion.
-- **Test layer:** Node's built-in test runner validates deterministic helpers without adding production dependencies.
+### 2. Convert or Optimize MP4
+- **Transcoding**: Converts WebM and heavy raw recordings to universally compatible H.264 / AAC MP4 with `+faststart` for web playback.
+- **Quality Presets**: Smaller file (CRF 28), Balanced (CRF 23), or High Quality (CRF 18).
+- **Resolution Scaling**: Downscale large 4K/1080p footage to 720p or 480p to reduce file weight.
+- **Advanced Tools**: Custom subtitle burn-in, audio track replacement, speed adjustments, and color grading filters.
 
-## Conversion behavior
+### 3. Video to GIF / WebP
+- **Palette Optimization**: Two-pass palette generation ensures smooth color gradients without banding or heavy dithering artifacts.
+- **Interactive Visual Cropping**: Drag-and-drop canvas handles allow cropping any rectangular frame area before rendering.
+- **Output Formats**: Standard animated `.gif` or lightweight animated `.webp`.
+- **Memory Safeguards**: GIF clips are bounded to 15 seconds to safeguard browser memory.
 
-- Files are processed one at a time to reduce peak browser memory use.
-- Compatible and incompatible files are reported before conversion begins.
-- A metadata bar displays codec, resolution, FPS, and duration for each loaded file.
-- Frame-by-frame navigation buttons allow precise positioning for trim and crop.
-- Trim values are checked against the real duration of the shortest selected file.
-- A thumbnail timeline renders extracted frames as a visual scrubbing reference in GIF mode.
-- Audio mode shows a waveform visualization decoded with the Web Audio API to help identify sections of interest.
-- Individual queue items report loading, active, completed, failed, or cancelled states.
-- MP4 conversion first attempts H.264 and falls back to MPEG-4 when necessary.
-- GIF creation uses a generated palette for more consistent color output.
-- WebP output uses canvas-based frame extraction for smaller, modern animated images.
-- GIF mode includes an optional visual crop tool with draggable handles for selecting a specific frame area.
-- Conversion time varies with video size, resolution, and device capabilities.
-- Audio extraction maps the first compatible audio stream and reports media without one.
-- Completed files include original size, output size, and the resulting percentage change.
-- The results panel scrolls into view automatically after conversion with a guidance note pointing to the download buttons.
-- A floating reset action clears files, results, trim values, and saved preferences.
+---
 
-## Repository structure
+## Advanced Video & Audio Tools
 
-| Path | Responsibility |
+### ◈ EBU R128 Loudness Normalization
+Broadcast and streaming normalization standard prevents quiet audio or sudden jarring peaks without introducing acoustic distortion. Recommended for podcasts, interviews, and multi-clip montages.
+
+### ◈ Subtitle Burn-In (`.srt` / `.vtt`)
+Upload external subtitle files to hardcode subtitles directly into the video stream. Subtitles are styled with crisp, high-contrast borders for legibility on all backgrounds.
+
+### ◈ Color & Style Grading
+Apply non-destructive visual filters during MP4 encoding:
+- **Vivid**: Enhances color saturation and punch.
+- **High Contrast**: Deepens shadows and sharpens highlights.
+- **Black & White**: Clean monochrome conversion.
+- **Cinematic Warm**: Golden hour warm tones for storytelling.
+
+### ◈ Audio Replacement & Track Selector
+Add custom background music (`.mp3`, `.wav`, `.aac`, `.m4a`, `.ogg`) or silence unwanted background audio tracks with the Mono, Stereo, or Mute selectors.
+
+---
+
+## Multi-Language & User Guide
+
+BeeTales includes full native localization for 4 languages with zero performance impact:
+- **English (EN)**
+- **Español (ES)**
+- **Português (PT)**
+- **Polski (PL)**
+
+Language preferences are automatically persisted in `localStorage` (`beetales-lang-v1`).
+
+### Interactive User Manual
+Click the **User Guide & Help** button in the header to open a comprehensive, tabbed documentation modal covering:
+1. **Overview & Workflow**: Step-by-step conversion quickstart.
+2. **Formats & Modes**: Technical breakdown of codecs and settings.
+3. **Audio & Loudness**: Understanding EBU R128 and bitrates.
+4. **Video & Subtitles**: Guide to color filters, subtitles, and speed adjustments.
+5. **Local Privacy**: How browser WebAssembly protects confidential media.
+
+---
+
+## History & Space Savings Calculator
+
+BeeTales includes a persistent session history and space savings calculator:
+- Tracks total files converted, input size vs. output size, and net megabytes saved.
+- Floating history button with dynamic savings badge (e.g. `24.5 MB saved`).
+- Modal breakdown displaying compression ratios per conversion (e.g. `-64% (12.3 MB)`).
+- Clear history with a single click.
+
+---
+
+## Presets & Shareable Links
+
+- **Saved Presets**: Save custom configurations (e.g. *"Podcast Audio 192k"*, *"WebM to 720p MP4"*) to `localStorage` for instant one-click recall.
+- **Shareable URLs**: Click **Share link** to copy a URL containing all active settings encoded in the hash fragment (`#c=...`). Anyone opening the link will have the exact same settings preloaded automatically.
+
+---
+
+## How It Works
+
+```mermaid
+flowchart TD
+    A[Select Media Files] --> B[Browser Validation & Metadata Inspection]
+    B --> C[Configure Mode, Bitrate, Loudness, Speed, Filters]
+    C --> D[Load Local ffmpeg.wasm Engine]
+    D --> E[Sequential In-Memory Processing]
+    E --> F[Generate Temporary Blob Object URLs]
+    F --> G[Instant Download / Batch Download All]
+    F --> H[Record Space Savings to History]
+```
+
+1. Files are loaded into browser memory via HTML5 File API.
+2. FFmpeg WebAssembly core executes all operations locally in browser RAM.
+3. Converted files are packaged as temporary `Blob` URLs ready for immediate download.
+4. Temporary files are automatically cleaned up from memory after conversion.
+
+---
+
+## Privacy & Security Guarantees
+
+| Concern | Guarantee |
 | --- | --- |
-| `index.html` | Semantic application markup and conversion controls |
-| `app.js` | Browser interaction, queue orchestration, ffmpeg commands, and downloads |
-| `converter-utils.js` | Pure parsing, formatting, filename, and trim helpers |
-| `style.css` | Structural layout, components, and responsive behavior |
-| `theme.css` | BeeTales swamp colors, branding treatments, and ambient effects |
-| `assets/` | Logo, hero artwork, mascot, background, and supporting images |
-| `vendor/ffmpeg/` | Local `@ffmpeg/ffmpeg`, `@ffmpeg/core`, and `@ffmpeg/util` files |
-| `test/` | Dependency-free automated utility tests |
-| `.github/FUNDING.yml` | GitHub Sponsors configuration |
-| `LICENSE` | MIT License |
+| **Media Transmission** | **0% Network Traffic**. Files never leave your local device. |
+| **Accounts & Registration** | **None**. No signup, authentication, or personal data collection. |
+| **Cookies & Trackers** | **Zero**. No tracking scripts, advertising pixels, or telemetry on files. |
+| **Offline Execution** | **100% Offline-Ready**. Once the page is loaded, conversions run without internet. |
+| **Runtime Dependencies** | All FFmpeg WebAssembly modules, fonts, and assets are served locally from the repository. |
 
-## Local development
+---
 
-The project has no install or build step. Browser security rules require it to be served over HTTP rather than opened directly with `file://`.
+## Architecture & Repository Structure
 
-With Python:
+```
+beetales-converter/
+├── index.html            # Application markup, i18n data tags, and dialog structures
+├── app.js                # Core controller: ffmpeg lifecycle, queue, UI orchestration
+├── translations.js       # Multi-language dictionary (EN, ES, PT, PL) & User Guide text
+├── converter-utils.js    # Pure parsing, time formatting, crop filters, and calculations
+├── style.css             # Base layout, typography, components, and responsive grid
+├── theme.css             # Industrial Circuit theme, neon accents, and dark aesthetic
+├── assets/               # Mascot, hero artwork, logos, and textures
+├── vendor/ffmpeg/        # Local ffmpeg.wasm browser engine and WebAssembly binaries
+└── test/
+    └── helpers.test.js   # Automated unit tests for converter utilities
+```
+
+---
+
+## Local Development & Deployment
+
+### Run Locally
+The application requires no build step. Serve over any HTTP server:
 
 ```bash
-cd beetales-converter
+# Using Python
 python3 -m http.server 8080
+
+# Using Node.js (npx)
+npx serve .
 ```
 
-Then open `http://localhost:8080`.
+Then open `http://localhost:8080` in your web browser.
 
-On Windows, if Python is not globally available, use any local static server. The server must return JavaScript modules and `.wasm` files with valid content types.
+### GitHub Pages Deployment
+BeeTales is 100% static and deploys seamlessly to GitHub Pages or static web hosts (Cloudflare Pages, Vercel, Netlify):
 
-## Deployment
+1. Go to repository **Settings** → **Pages**.
+2. Select `main` branch and root `/` folder.
+3. Save and your private converter is live globally.
 
-### GitHub Pages
+---
 
-The application can be published directly from the repository because it is fully static. The deployed artifact must include:
+## Quality & Automated Tests
 
-```text
-index.html
-style.css
-theme.css
-app.js
-converter-utils.js
-favicon.ico
-favicon.png
-assets/
-vendor/
-```
-
-The complete `vendor/ffmpeg` directory is required. The converter deliberately does not download its processing engine from a CDN.
-
-<details>
-<summary><strong>Nginx deployment on Ubuntu</strong></summary>
-
-Install Nginx:
-
-```bash
-sudo apt update
-sudo apt install nginx -y
-```
-
-Copy the static application:
-
-```bash
-sudo mkdir -p /var/www/beetales-converter
-sudo cp -r index.html style.css theme.css app.js converter-utils.js assets vendor favicon.ico favicon.png /var/www/beetales-converter/
-sudo chown -R www-data:www-data /var/www/beetales-converter
-```
-
-Create `/etc/nginx/sites-available/beetales-converter`:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /var/www/beetales-converter;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ =404;
-    }
-
-    types {
-        text/html html;
-        text/css css;
-        application/javascript js;
-        application/wasm wasm;
-    }
-
-    add_header X-Content-Type-Options nosniff;
-}
-```
-
-Enable the site and reload Nginx:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/beetales-converter /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-HTTPS is strongly recommended for public deployments and can be configured with Certbot or another certificate provider.
-
-</details>
-
-## Quality and validation
-
-The deterministic conversion helpers use Node's built-in test runner:
+Run the built-in Node test suite:
 
 ```bash
 npm test
 ```
 
-| Check | Purpose |
-| --- | --- |
-| Utility tests | Cover supported and malformed time values, trim arguments, crop filter generation, byte and duration formatting, extensions, and safe filenames |
-| JavaScript syntax checks | Confirm application and utility modules parse successfully |
-| Browser interaction checks | Exercise mode switching, reset behavior, queue locking, failure recovery, and responsive layout |
-| Local-reference checks | Confirm that HTML scripts, styles, icons, and images resolve from committed paths |
+Tests validate:
+- Time string parsing (`MM:SS`, `HH:MM:SS`, fractional seconds).
+- Trim duration calculations and clamping.
+- Crop filter coordinate computations.
+- Safe filename generation and extension detection.
+- Byte and duration formatting helpers.
 
-The application remains a static site. Running tests does not require installing third-party packages.
-
-## Limitations
-
-- Conversion speed depends on the device, browser, input codec, duration, and output settings.
-- Large or high-resolution files can exceed browser memory limits.
-- MP4 conversion and optimization are more CPU-intensive than audio extraction.
-- GIF and WebP clips are intentionally limited to 15 seconds.
-- WebP animated output relies on canvas frame extraction and may produce larger files than GIF for some content.
-- Thumbnail timeline and waveform generation add processing time when files are first loaded.
-- Browser codec support can affect preview metadata even when ffmpeg can read the file.
-- Downloads are temporary and are not preserved after the page is closed or reloaded.
-- Multiple automatic downloads may require explicit browser permission.
-- There is no cloud history, background processing, or synchronization between devices.
-
-## Troubleshooting
-
-| Symptom | Recommended action |
-| --- | --- |
-| Controls appear but do not react | Serve the repository over HTTP instead of opening `index.html` with `file://` |
-| Worker or `SecurityError` message | Refresh the page and verify that all files in `vendor/ffmpeg` were deployed |
-| Conversion engine times out | Refresh, close memory-intensive tabs, and try a smaller file or batch |
-| Browser runs out of memory | Process fewer, shorter, or lower-resolution files |
-| No audio output is generated | Confirm that the source contains a compatible audio stream |
-| GIF conversion fails | Choose a shorter trim range or a smaller GIF width and frame rate |
-| WebP conversion fails | Try a shorter clip or smaller width; ensure the browser supports `image/webp` canvas export |
-| Thumbnail timeline is blank | Wait for thumbnails to load after selecting a file; large files may take longer |
-| Waveform not visible | Audio decoding may fail for very large files; try a shorter clip |
-| MP4 conversion is slow | Use a smaller output resolution or the smaller-file quality preset |
+---
 
 ## Contributing
 
-Bug reports, compatibility findings, accessibility improvements, and focused feature proposals are welcome through [GitHub Issues](https://github.com/Sorairei/beetales-converter/issues).
+Contributions that respect the **local-first, 100% client-side privacy architecture** are welcome!
 
-Contributions should preserve the browser-only privacy model, static-hosting compatibility, local ffmpeg runtime, existing English interface, and BeeTales visual identity.
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
+
+---
 
 ## Sponsorship
 
-BeeTales Media Converter is free and open source. If it saves you time, you can support continued maintenance through [GitHub Sponsors](https://github.com/sponsors/Sorairei).
+BeeTales Media Converter is free and open source. If this tool saves you time or server bandwidth costs, consider supporting continued maintenance:
+
+👉 **[Sponsor Sorairei on GitHub](https://github.com/sponsors/Sorairei)**
+
+---
 
 ## License
 
 Released under the [MIT License](LICENSE). Copyright © 2026 [Sorairei](https://github.com/Sorairei).
-
----
 
 <p align="center">
   Built with care by <a href="https://github.com/Sorairei">Sorairei</a> and the BeeTales community.

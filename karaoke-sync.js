@@ -1324,3 +1324,291 @@ export function drawAudioVisualizerBackground(ctx, width, height, currentTime) {
     ctx.fill();
   }
 }
+
+/**
+ * Resamples an audio channel from any sample rate (e.g. 44100Hz, 48000Hz) to 16,000Hz
+ * using linear interpolation for Whisper AI input.
+ * @param {Float32Array|Array<number>} channelData - Source audio samples
+ * @param {number} [originalSampleRate=44100] - Original sample rate in Hz
+ * @returns {Float32Array} Resampled 16 kHz Float32Array
+ */
+export function resampleTo16kHz(channelData, originalSampleRate = 44100) {
+  if (!channelData || !channelData.length) return new Float32Array(0);
+  if (originalSampleRate === 16000) return channelData;
+
+  const targetSampleRate = 16000;
+  const ratio = originalSampleRate / targetSampleRate;
+  const targetLength = Math.round(channelData.length / ratio);
+  const resampled = new Float32Array(targetLength);
+
+  for (let i = 0; i < targetLength; i++) {
+    const origIndex = i * ratio;
+    const indexFloor = Math.floor(origIndex);
+    const indexCeil = Math.min(channelData.length - 1, indexFloor + 1);
+    const fraction = origIndex - indexFloor;
+    resampled[i] = channelData[indexFloor] * (1 - fraction) + channelData[indexCeil] * fraction;
+  }
+
+  return resampled;
+}
+
+/**
+ * Normalizes text for phonetic matching (lowercase, no accents, no punctuation)
+ */
+function normalizeWordForMatching(str) {
+  return String(str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .trim();
+}
+
+/**
+ * Calculates Levenshtein similarity (0.0 to 1.0) between two words
+ */
+function stringSimilarity(s1, s2) {
+  if (s1 === s2) return 1.0;
+  if (!s1 || !s2) return 0.0;
+  const l1 = s1.length;
+  const l2 = s2.length;
+  const maxLen = Math.max(l1, l2);
+  if (maxLen === 0) return 1.0;
+
+  const d = [];
+  for (let i = 0; i <= l1; i++) d[i] = [i];
+  for (let j = 0; j <= l2; j++) d[0][j] = j;
+
+  for (let i = 1; i <= l1; i++) {
+    for (let j = 1; j <= l2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  const distance = d[l1][l2];
+  return 1.0 - (distance / maxLen);
+}
+
+/**
+ * Maps Whisper ASR timestamped chunks to the user's structured lyrics words.
+ * Handles fuzzy matches, ASR noise, omissions, and maintains line/block structure.
+ * @param {Array<Object>} words - Structured words array from splitLyricsIntoWords
+ * @param {Array<Object>} whisperChunks - Timestamped chunks from Whisper [{ text: string, timestamp: [start, end] }]
+ * @returns {Array<Object>} Updated words with precision AI timestamps
+ */
+export function alignLyricsWithWhisperChunks(words, whisperChunks = []) {
+  if (!words || !words.length) return [];
+  if (!whisperChunks || !whisperChunks.length) return words;
+
+  // Flatten and normalize whisper chunks
+  const cleanedChunks = [];
+  for (const chunk of whisperChunks) {
+    if (!chunk || !chunk.text) continue;
+    const chunkWords = chunk.text.trim().split(/\s+/).filter(Boolean);
+    const ts = Array.isArray(chunk.timestamp) ? chunk.timestamp : [null, null];
+    const cStart = ts[0] !== null && !isNaN(ts[0]) ? Number(ts[0]) : null;
+    const cEnd = ts[1] !== null && !isNaN(ts[1]) ? Number(ts[1]) : (cStart !== null ? cStart + 0.35 : null);
+
+    if (chunkWords.length <= 1) {
+      cleanedChunks.push({
+        rawText: chunk.text.trim(),
+        cleanText: normalizeWordForMatching(chunk.text),
+        start: cStart,
+        end: cEnd,
+      });
+    } else {
+      // Split multi-word chunk proportionally
+      const dur = cEnd !== null && cStart !== null ? Math.max(0.2, cEnd - cStart) : 0.4 * chunkWords.length;
+      const step = dur / chunkWords.length;
+      chunkWords.forEach((cw, idx) => {
+        const wStart = cStart !== null ? cStart + idx * step : null;
+        const wEnd = wStart !== null ? wStart + step : null;
+        cleanedChunks.push({
+          rawText: cw,
+          cleanText: normalizeWordForMatching(cw),
+          start: wStart !== null ? Number(wStart.toFixed(2)) : null,
+          end: wEnd !== null ? Number(wEnd.toFixed(2)) : null,
+        });
+      });
+    }
+  }
+
+  if (!cleanedChunks.length) return words;
+
+  // Needleman-Wunsch Global Sequence Alignment
+  const M = words.length;
+  const N = cleanedChunks.length;
+  const GAP_PENALTY = -0.35;
+
+  const dp = Array.from({ length: M + 1 }, () => new Float32Array(N + 1));
+  for (let i = 0; i <= M; i++) dp[i][0] = i * GAP_PENALTY;
+  for (let j = 0; j <= N; j++) dp[0][j] = j * GAP_PENALTY;
+
+  for (let i = 1; i <= M; i++) {
+    const uClean = normalizeWordForMatching(words[i - 1].text);
+    for (let j = 1; j <= N; j++) {
+      const aClean = cleanedChunks[j - 1].cleanText;
+      const sim = stringSimilarity(uClean, aClean);
+      const matchScore = sim >= 0.55 ? sim * 1.5 : -0.5;
+
+      dp[i][j] = Math.max(
+        dp[i - 1][j - 1] + matchScore, // Match / Mismatch
+        dp[i - 1][j] + GAP_PENALTY,    // Deletion (missing in ASR)
+        dp[i][j - 1] + GAP_PENALTY     // Insertion (extra word in ASR)
+      );
+    }
+  }
+
+  // Backtrack to find optimal match pairs
+  let i = M;
+  let j = N;
+  const matchedPairs = new Map();
+
+  while (i > 0 && j > 0) {
+    const uClean = normalizeWordForMatching(words[i - 1].text);
+    const aClean = cleanedChunks[j - 1].cleanText;
+    const sim = stringSimilarity(uClean, aClean);
+    const matchScore = sim >= 0.55 ? sim * 1.5 : -0.5;
+
+    if (Math.abs(dp[i][j] - (dp[i - 1][j - 1] + matchScore)) < 1e-4 && sim >= 0.55) {
+      matchedPairs.set(i - 1, j - 1);
+      i--;
+      j--;
+    } else if (Math.abs(dp[i][j] - (dp[i - 1][j] + GAP_PENALTY)) < 1e-4) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  // Apply matched timestamps
+  for (const [wIdx, cIdx] of matchedPairs.entries()) {
+    const chunk = cleanedChunks[cIdx];
+    if (chunk.start !== null) {
+      words[wIdx].start = chunk.start;
+      words[wIdx].end = chunk.end || Number((chunk.start + 0.35).toFixed(2));
+    }
+  }
+
+  // Interpolation Pass for unmatched words between matched anchors
+  let lastAnchorTime = cleanedChunks[0].start !== null ? cleanedChunks[0].start : 1.0;
+
+  for (let k = 0; k < words.length; k++) {
+    if (words[k].start !== null) {
+      lastAnchorTime = words[k].end;
+      continue;
+    }
+
+    // Find next matched anchor
+    let nextAnchorTime = null;
+    let nextAnchorIdx = -1;
+    for (let m = k + 1; m < words.length; m++) {
+      if (words[m].start !== null) {
+        nextAnchorTime = words[m].start;
+        nextAnchorIdx = m;
+        break;
+      }
+    }
+
+    if (nextAnchorTime !== null && nextAnchorIdx !== -1) {
+      // Interpolate between lastAnchorTime and nextAnchorTime
+      const span = Math.max(0.3, nextAnchorTime - lastAnchorTime);
+      const missingCount = nextAnchorIdx - k;
+      const step = span / (missingCount + 1);
+
+      const wStart = lastAnchorTime + step * 0.15;
+      const wEnd = wStart + Math.max(0.15, step * 0.85);
+      words[k].start = Number(wStart.toFixed(2));
+      words[k].end = Number(wEnd.toFixed(2));
+      lastAnchorTime = words[k].end;
+    } else {
+      // No next anchor: advance from lastAnchorTime
+      const wStart = lastAnchorTime + 0.05;
+      const wEnd = wStart + 0.35;
+      words[k].start = Number(wStart.toFixed(2));
+      words[k].end = Number(wEnd.toFixed(2));
+      lastAnchorTime = wEnd;
+    }
+  }
+
+  // Monotonicity & bounds check
+  for (let k = 0; k < words.length - 1; k++) {
+    if (words[k].end > words[k + 1].start) {
+      words[k].end = Number(Math.max(words[k].start + 0.08, words[k + 1].start).toFixed(2));
+    }
+  }
+
+  return words;
+}
+
+/**
+ * Runs Whisper Speech-to-Text inference directly inside the browser using Transformers.js (ONNX/Wasm).
+ * @param {AudioBuffer|Object} audioData - Audio buffer containing audio channel samples
+ * @param {Object} [options] - Options like language, model ('Xenova/whisper-tiny')
+ * @param {Function} [onProgress] - Callback for model download and inference progress
+ * @returns {Promise<Array<Object>>} Chunks with word-level timestamps
+ */
+export async function transcribeWithWhisperAI(audioData, options = {}, onProgress = () => {}) {
+  const modelName = options.model || "Xenova/whisper-tiny";
+  onProgress({ status: "init", message: `Initializing local AI (${modelName})...` });
+
+  // 1. Extract and resample audio PCM to 16 kHz Mono Float32Array
+  let channelData = null;
+  let sampleRate = 44100;
+
+  if (audioData.getChannelData) {
+    channelData = audioData.getChannelData(0);
+    sampleRate = audioData.sampleRate || 44100;
+  } else if (audioData.channelData) {
+    channelData = audioData.channelData;
+    sampleRate = audioData.sampleRate || 44100;
+  }
+
+  if (!channelData || !channelData.length) {
+    throw new Error("No audio samples found in audio buffer.");
+  }
+
+  onProgress({ status: "resampling", message: "Resampling audio to 16 kHz for Whisper AI..." });
+  const audio16k = resampleTo16kHz(channelData, sampleRate);
+
+  // 2. Dynamically import Transformers.js from CDN
+  onProgress({ status: "loading_transformers", message: "Loading Transformers.js WebAssembly runtime..." });
+  const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2");
+  env.allowLocalModels = false;
+  env.useBrowserCache = true;
+
+  onProgress({ status: "loading_model", message: "Loading Whisper AI neural network (~39MB)..." });
+  const transcriber = await pipeline("automatic-speech-recognition", modelName, {
+    quantized: true,
+    progress_callback: (prog) => {
+      if (prog.status === "progress" && prog.progress !== undefined) {
+        onProgress({
+          status: "downloading",
+          percent: Math.round(prog.progress),
+          file: prog.file || "model.onnx",
+          message: `Downloading AI model (~39MB): ${Math.round(prog.progress)}%`,
+        });
+      } else if (prog.status === "done") {
+        onProgress({ status: "loaded", message: `Loaded ${prog.file || "model"} from cache.` });
+      }
+    },
+  });
+
+  onProgress({ status: "transcribing", message: "AI analyzing voice phonemes & word timestamps..." });
+
+  const output = await transcriber(audio16k, {
+    return_timestamps: "word",
+    chunk_length_s: 30,
+    stride_length_s: 5,
+    language: options.language || null,
+    task: "transcribe",
+  });
+
+  return output?.chunks || [];
+}
+

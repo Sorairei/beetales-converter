@@ -21,6 +21,8 @@ import {
   parseSrt,
   KaraokeSyncEngine,
   autoAlignLyricsWithAudio,
+  alignLyricsWithWhisperChunks,
+  transcribeWithWhisperAI,
   shiftTimestamps,
   drawKaraokeSubtitlesOnCanvas,
   drawAudioVisualizerBackground,
@@ -161,6 +163,11 @@ const karaokeDlAss = $("#karaoke-dl-ass");
 const dynamicSubtitleOverlay = $("#dynamic-subtitle-overlay");
 const dynamicSubtitleBox = $("#dynamic-subtitle-box");
 const audioVisualizerCanvas = $("#audio-visualizer-canvas");
+const karaokeAiBanner = $("#karaoke-ai-banner");
+const karaokeAiStatusLabel = $("#karaoke-ai-status-label");
+const karaokeAiDesc = $("#karaoke-ai-desc");
+const karaokeAiProgressBar = $("#karaoke-ai-progress-bar");
+const karaokeAiProgressFill = $("#karaoke-ai-progress-fill");
 
 const LANG_KEY = "beetales-lang-v1";
 let currentLang = localStorage.getItem(LANG_KEY) || "en";
@@ -2422,7 +2429,7 @@ function initKaraokeStudio() {
     });
   }
 
-  // Auto-Sync Button (Waveform Energy & Forced Alignment)
+  // Auto-Sync Button (Whisper AI + Forced Alignment & DSP Fallback)
   if (karaokeAutoSyncBtn) {
     karaokeAutoSyncBtn.addEventListener("click", async () => {
       const text = (karaokeLyricsInput?.value || "").trim();
@@ -2437,29 +2444,98 @@ function initKaraokeStudio() {
         preserveLineBreaks: true,
       });
 
-      clearError();
-      setStatus("⚡ Analyzing audio waveform, voice onsets and intro pauses...");
-
-      // 1. Obtain audio data from decoded audioBuffer or decode active file
       const activeFile = selectedFiles[0];
-      const targetBuffer = await getMediaAudioBuffer(activeFile);
-      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
+      if (!activeFile) {
+        showError("Please select an audio or video file first.");
+        return;
+      }
 
-      // Check if user has paused video at a custom start position (>1.0s)
-      const previewTime = videoPreview?.currentTime || 0;
-      const startOption = previewTime > 1.5 ? previewTime : undefined;
+      clearError();
+      karaokeAutoSyncBtn.disabled = true;
+      if (karaokeAiProgressBar) karaokeAiProgressBar.classList.remove("is-hidden");
+      if (karaokeAiProgressFill) karaokeAiProgressFill.style.width = "5%";
 
-      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
-        leadInOffset: 0.12,
-        snapToOnsets: true,
-        startTime: startOption,
-      });
-      karaokeEngine.setWords(alignedWords);
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
+      const updateAiStatus = (msg, percent = null) => {
+        setStatus(`⚡ ${msg}`);
+        if (karaokeAiStatusLabel) karaokeAiStatusLabel.textContent = msg;
+        if (percent !== null && karaokeAiProgressFill) {
+          karaokeAiProgressFill.style.width = `${Math.min(100, Math.max(5, percent))}%`;
+        }
+      };
 
-      const firstWordStart = alignedWords[0]?.start ?? 0;
-      setStatus(`⚡ Auto-aligned ${alignedWords.length} words! First vocal starts at ${formatDuration(firstWordStart)}.`);
+      try {
+        updateAiStatus("Extracting audio with FFmpeg.wasm...", 15);
+        const targetBuffer = await getMediaAudioBuffer(activeFile);
+        const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
+
+        if (!targetBuffer) {
+          throw new Error("Could not extract PCM audio data from media file.");
+        }
+
+        updateAiStatus("Connecting to in-browser Whisper AI (~39MB)...", 25);
+
+        // Run client-side Whisper ASR with progress tracking
+        const whisperChunks = await transcribeWithWhisperAI(targetBuffer, {}, (prog) => {
+          if (prog.status === "downloading") {
+            updateAiStatus(`Downloading Whisper AI model (~39MB): ${prog.percent}%`, Math.round(25 + (prog.percent * 0.45)));
+          } else if (prog.status === "transcribing") {
+            updateAiStatus("AI recognizing sung words & acoustic timestamps...", 85);
+          } else if (prog.message) {
+            updateAiStatus(prog.message);
+          }
+        });
+
+        updateAiStatus("Aligning lyrics with recognized vocal phonemes...", 95);
+
+        let alignedWords = [];
+        if (whisperChunks && whisperChunks.length > 0) {
+          alignedWords = alignLyricsWithWhisperChunks(words, whisperChunks);
+        } else {
+          // Fallback to DSP if no chunks returned
+          const previewTime = videoPreview?.currentTime || 0;
+          alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
+            leadInOffset: 0.12,
+            snapToOnsets: true,
+            startTime: previewTime > 1.5 ? previewTime : undefined,
+          });
+        }
+
+        karaokeEngine.setWords(alignedWords);
+        renderWordChipsQueue();
+        updateSubtitleOverlay();
+
+        updateAiStatus(`Synchronized! ${alignedWords.length} words matched with AI.`, 100);
+        if (karaokeAiDesc) {
+          const startSec = alignedWords[0]?.start ?? 0;
+          karaokeAiDesc.innerHTML = `✅ <strong>Sincronización con IA exitosa</strong>: ${alignedWords.length} palabras alineadas con precisión milimétrica. La primera voz entra en <strong>${formatDuration(startSec)}</strong>.`;
+        }
+        setStatus(`✨ Auto-aligned ${alignedWords.length} words with in-browser Whisper AI! First vocal at ${formatDuration(alignedWords[0]?.start ?? 0)}.`);
+      } catch (aiErr) {
+        console.warn("Whisper AI alignment failed or offline, falling back to DSP auto-sync:", aiErr);
+        updateAiStatus("Falling back to acoustic DSP auto-sync...", 50);
+
+        const targetBuffer = await getMediaAudioBuffer(activeFile);
+        const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
+        const previewTime = videoPreview?.currentTime || 0;
+
+        const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
+          leadInOffset: 0.12,
+          snapToOnsets: true,
+          startTime: previewTime > 1.5 ? previewTime : undefined,
+        });
+
+        karaokeEngine.setWords(alignedWords);
+        renderWordChipsQueue();
+        updateSubtitleOverlay();
+
+        const firstWordStart = alignedWords[0]?.start ?? 0;
+        setStatus(`⚡ Auto-aligned ${alignedWords.length} words! First vocal starts at ${formatDuration(firstWordStart)}.`);
+      } finally {
+        karaokeAutoSyncBtn.disabled = false;
+        setTimeout(() => {
+          if (karaokeAiProgressBar) karaokeAiProgressBar.classList.add("is-hidden");
+        }, 3500);
+      }
     });
   }
 

@@ -408,14 +408,26 @@
                         <option value="12" data-i18n="karaoke_opt_full">Full lines (Natural)</option>
                       </select>
                     </div>
-                    <button type="button" class="karaoke-auto-sync-btn" id="karaoke-auto-sync-btn" title="Automatically analyze audio to sync all words with 1 click">
+                    <button type="button" class="karaoke-auto-sync-btn" id="karaoke-auto-sync-btn" title="AI-powered word-level speech recognition and forced alignment (Whisper)">
                       <span aria-hidden="true">&#9889;</span>
-                      <span data-i18n="karaoke_auto_sync_button">⚡ Auto-Sync with Audio</span>
+                      <span data-i18n="karaoke_auto_sync_button">⚡ Auto-Sync with AI (Whisper)</span>
                     </button>
                     <button type="button" class="karaoke-prepare-btn" id="karaoke-prepare-btn">
                       <span aria-hidden="true">&#9881;</span>
                       <span data-i18n="karaoke_parse_button">Prepare Words for Sync</span>
                     </button>
+                  </div>
+
+                  <!-- AI Explanation & Progress Banner -->
+                  <div class="karaoke-ai-banner" id="karaoke-ai-banner">
+                    <div class="karaoke-ai-badge-row">
+                      <span class="karaoke-ai-badge">🤖 OpenAI Whisper · 100% In-Browser AI</span>
+                      <span id="karaoke-ai-status-label">Ready for Voice Recognition</span>
+                    </div>
+                    <p id="karaoke-ai-desc">Recognizes sung words and matches each word's exact start and end timestamps. First use downloads a lightweight <strong>~39 MB model</strong> stored in your browser cache. <em>100% private — your media never leaves your device.</em></p>
+                    <div class="karaoke-ai-progress-bar is-hidden" id="karaoke-ai-progress-bar">
+                      <div class="karaoke-ai-progress-fill" id="karaoke-ai-progress-fill"></div>
+                    </div>
                   </div>
                 </div>
 

@@ -18,6 +18,8 @@ import {
   detectAudioOnsets,
   calculateVocalSegments,
   autoAlignLyricsWithAudio,
+  resampleTo16kHz,
+  alignLyricsWithWhisperChunks,
   shiftTimestamps,
   drawKaraokeSubtitlesOnCanvas,
   drawAudioVisualizerBackground,
@@ -391,6 +393,72 @@ test("autoAlignLyricsWithAudio correctly respects delayed vocal entrance and avo
   );
   assert.ok(aligned[aligned.length - 1].end <= duration);
 });
+
+test("resampleTo16kHz converts audio buffers from 44.1kHz / 48kHz to 16kHz Float32Array", () => {
+  const originalRate = 48000;
+  const inputSamples = new Float32Array(originalRate * 2); // 2 seconds
+  for (let i = 0; i < inputSamples.length; i++) {
+    inputSamples[i] = Math.sin(2 * Math.PI * 440 * (i / originalRate));
+  }
+
+  const resampled = resampleTo16kHz(inputSamples, originalRate);
+  const expectedLength = 16000 * 2;
+  assert.equal(resampled.length, expectedLength);
+  assert.ok(resampled instanceof Float32Array);
+});
+
+test("alignLyricsWithWhisperChunks accurately matches AI transcription chunks with lyrics and interpolates gaps", () => {
+  const lyrics = "Yo te quiero padre y te doy las gracias\nPor tu gran esfuerzo y por darme la vida";
+  const words = splitLyricsIntoWords(lyrics, { wordsPerBlock: 4 });
+
+  // Simulated Whisper chunks (with word-level timestamps)
+  const whisperChunks = [
+    { text: " Yo", timestamp: [14.20, 14.50] },
+    { text: " te", timestamp: [14.50, 14.75] },
+    { text: " quiero", timestamp: [14.75, 15.30] },
+    { text: " padre", timestamp: [15.30, 15.90] },
+    { text: " y", timestamp: [15.90, 16.10] },
+    { text: " te", timestamp: [16.10, 16.30] },
+    { text: " doy", timestamp: [16.30, 16.65] },
+    { text: " las", timestamp: [16.65, 16.90] },
+    { text: " gracias", timestamp: [16.90, 17.60] },
+    // Simulate slight omission in ASR for "Por tu" then matching "gran esfuerzo"
+    { text: " gran", timestamp: [19.20, 19.60] },
+    { text: " esfuerzo", timestamp: [19.60, 20.40] },
+    { text: " y por", timestamp: [20.40, 21.00] },
+    { text: " darme", timestamp: [21.00, 21.50] },
+    { text: " la", timestamp: [21.50, 21.75] },
+    { text: " vida", timestamp: [21.75, 22.40] },
+  ];
+
+  const aligned = alignLyricsWithWhisperChunks(words, whisperChunks);
+
+  assert.equal(aligned.length, words.length);
+  // Word 0 "Yo" should have exact Whisper timestamp 14.20
+  assert.equal(aligned[0].text, "Yo");
+  assert.equal(aligned[0].start, 14.20);
+  assert.equal(aligned[0].end, 14.50);
+
+  // Word 3 "padre" should have exact timestamp 15.30
+  assert.equal(aligned[3].text, "padre");
+  assert.equal(aligned[3].start, 15.30);
+
+  // Omitted words "Por" and "tu" should be smoothly interpolated between 17.60 and 19.20
+  const porWord = aligned.find((w) => w.text === "Por");
+  const tuWord = aligned.find((w) => w.text === "tu");
+  assert.ok(porWord.start >= 17.60 && porWord.start < tuWord.start, "Por must be after gracias and before tu");
+  assert.ok(tuWord.end <= 19.20, "tu must end before gran (19.20)");
+
+  // Strict monotonicity check
+  for (let i = 0; i < aligned.length - 1; i++) {
+    assert.ok(
+      aligned[i].start <= aligned[i + 1].start,
+      `Word ${i} (${aligned[i].text}: ${aligned[i].start}) must be <= word ${i + 1} (${aligned[i + 1].text}: ${aligned[i + 1].start})`
+    );
+    assert.ok(aligned[i].end > aligned[i].start, `Word ${i} end must be greater than start`);
+  }
+});
+
 
 
 

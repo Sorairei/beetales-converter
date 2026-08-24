@@ -144,6 +144,7 @@ const karaokePrepareBtn = $("#karaoke-prepare-btn");
 const karaokeAutoSyncBtn = $("#karaoke-auto-sync-btn");
 const karaokeFileInput = $("#karaoke-file-input");
 const karaokeWordsQueue = $("#karaoke-words-queue");
+const karaokeDspSyncBtn = $("#karaoke-dsp-sync-btn");
 const karaokeTapBtn = $("#karaoke-tap-btn");
 const karaokeUndoBtn = $("#karaoke-undo-btn");
 const karaokeResetBtn = $("#karaoke-reset-btn");
@@ -2536,6 +2537,44 @@ function initKaraokeStudio() {
           if (karaokeAiProgressBar) karaokeAiProgressBar.classList.add("is-hidden");
         }, 3500);
       }
+    });
+  }
+
+  // Fast DSP Sync Button (0.02s acoustic heuristic without AI download)
+  if (karaokeDspSyncBtn) {
+    karaokeDspSyncBtn.addEventListener("click", async () => {
+      const text = (karaokeLyricsInput?.value || "").trim();
+      if (!text) {
+        showError("Please paste your lyrics or script in the box first.");
+        karaokeLyricsInput?.focus();
+        return;
+      }
+
+      const words = splitLyricsIntoWords(text, {
+        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
+        preserveLineBreaks: true,
+      });
+
+      const activeFile = selectedFiles[0];
+      clearError();
+      setStatus("⚡ Analyzing acoustic rhythm and vocal energy (Fast DSP)...");
+
+      const targetBuffer = await getMediaAudioBuffer(activeFile);
+      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
+      const previewTime = videoPreview?.currentTime || 0;
+
+      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
+        leadInOffset: 0.12,
+        snapToOnsets: true,
+        startTime: previewTime > 1.5 ? previewTime : undefined,
+      });
+
+      karaokeEngine.setWords(alignedWords);
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+
+      const firstWordStart = alignedWords[0]?.start ?? 0;
+      setStatus(`⚡ Fast DSP aligned ${alignedWords.length} words! First vocal at ${formatDuration(firstWordStart)}.`);
     });
   }
 

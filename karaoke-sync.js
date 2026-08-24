@@ -1547,16 +1547,14 @@ export function alignLyricsWithWhisperChunks(words, whisperChunks = []) {
 }
 
 /**
- * Runs Whisper Speech-to-Text inference directly inside the browser using Transformers.js (ONNX/Wasm).
+ * Runs Whisper Speech-to-Text inference inside a dedicated background Web Worker
+ * so that the main browser thread remains 100% responsive without freezing.
  * @param {AudioBuffer|Object} audioData - Audio buffer containing audio channel samples
  * @param {Object} [options] - Options like language, model ('Xenova/whisper-tiny')
  * @param {Function} [onProgress] - Callback for model download and inference progress
  * @returns {Promise<Array<Object>>} Chunks with word-level timestamps
  */
 export async function transcribeWithWhisperAI(audioData, options = {}, onProgress = () => {}) {
-  const modelName = options.model || "Xenova/whisper-tiny";
-  onProgress({ status: "init", message: `Initializing local AI (${modelName})...` });
-
   // 1. Extract and resample audio PCM to 16 kHz Mono Float32Array
   let channelData = null;
   let sampleRate = 44100;
@@ -1576,39 +1574,101 @@ export async function transcribeWithWhisperAI(audioData, options = {}, onProgres
   onProgress({ status: "resampling", message: "Resampling audio to 16 kHz for Whisper AI..." });
   const audio16k = resampleTo16kHz(channelData, sampleRate);
 
-  // 2. Dynamically import Transformers.js from CDN
-  onProgress({ status: "loading_transformers", message: "Loading Transformers.js WebAssembly runtime..." });
-  const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2");
-  env.allowLocalModels = false;
-  env.useBrowserCache = true;
+  // 2. Offload to dedicated background Web Worker
+  onProgress({ status: "init_worker", message: "Starting background AI worker thread..." });
 
-  onProgress({ status: "loading_model", message: "Loading Whisper AI neural network (~39MB)..." });
-  const transcriber = await pipeline("automatic-speech-recognition", modelName, {
-    quantized: true,
-    progress_callback: (prog) => {
-      if (prog.status === "progress" && prog.progress !== undefined) {
-        onProgress({
-          status: "downloading",
-          percent: Math.round(prog.progress),
-          file: prog.file || "model.onnx",
-          message: `Downloading AI model (~39MB): ${Math.round(prog.progress)}%`,
+  return new Promise((resolve, reject) => {
+    let worker;
+    try {
+      worker = new Worker(new URL("./whisper-worker.js", import.meta.url), { type: "module" });
+    } catch (workerErr) {
+      // Inline Blob worker fallback if external module worker URL is restricted
+      const workerCode = `
+        import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        let instance = null;
+        self.addEventListener("message", async (e) => {
+          if (e.data?.type === "transcribe") {
+            try {
+              if (!instance) {
+                instance = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny", {
+                  quantized: true,
+                  progress_callback: (p) => {
+                    if (p.status === "progress" && p.progress !== undefined) {
+                      self.postMessage({ type: "progress", status: "downloading", percent: Math.round(p.progress), file: p.file });
+                    } else if (p.status === "done") {
+                      self.postMessage({ type: "progress", status: "loaded", file: p.file });
+                    }
+                  }
+                });
+              }
+              self.postMessage({ type: "progress", status: "transcribing" });
+              const out = await instance(e.data.data, {
+                return_timestamps: "word",
+                chunk_length_s: 30,
+                stride_length_s: 5,
+                language: e.data.options?.language || null,
+                task: "transcribe"
+              });
+              self.postMessage({ type: "complete", chunks: out?.chunks || [] });
+            } catch (err) {
+              self.postMessage({ type: "error", error: err.message || String(err) });
+            }
+          }
         });
-      } else if (prog.status === "done") {
-        onProgress({ status: "loaded", message: `Loaded ${prog.file || "model"} from cache.` });
+      `;
+      const blob = new Blob([workerCode], { type: "application/javascript" });
+      worker = new Worker(URL.createObjectURL(blob), { type: "module" });
+    }
+
+    worker.onmessage = (event) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === "progress") {
+        if (msg.status === "downloading") {
+          onProgress({
+            status: "downloading",
+            percent: msg.percent,
+            file: msg.file,
+            message: `Downloading Whisper AI model (~39MB): ${msg.percent}%`,
+          });
+        } else if (msg.status === "transcribing") {
+          onProgress({
+            status: "transcribing",
+            percent: 85,
+            message: "AI analyzing voice phonemes & acoustic timestamps in background...",
+          });
+        } else if (msg.status === "loaded") {
+          onProgress({
+            status: "loaded",
+            message: `Loaded AI model (${msg.file || "ONNX"}) from cache.`,
+          });
+        }
+      } else if (msg.type === "complete") {
+        worker.terminate();
+        resolve(msg.chunks || []);
+      } else if (msg.type === "error") {
+        worker.terminate();
+        reject(new Error(msg.error || "Whisper transcription failed in worker"));
       }
-    },
+    };
+
+    worker.onerror = (err) => {
+      worker.terminate();
+      reject(err);
+    };
+
+    // Pass data using zero-copy transfer of underlying ArrayBuffer
+    worker.postMessage(
+      {
+        type: "transcribe",
+        data: audio16k,
+        options,
+      },
+      [audio16k.buffer]
+    );
   });
-
-  onProgress({ status: "transcribing", message: "AI analyzing voice phonemes & word timestamps..." });
-
-  const output = await transcriber(audio16k, {
-    return_timestamps: "word",
-    chunk_length_s: 30,
-    stride_length_s: 5,
-    language: options.language || null,
-    task: "transcribe",
-  });
-
-  return output?.chunks || [];
 }
 

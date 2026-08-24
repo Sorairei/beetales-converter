@@ -408,9 +408,13 @@
                         <option value="12" data-i18n="karaoke_opt_full">Full lines (Natural)</option>
                       </select>
                     </div>
-                    <button type="button" class="karaoke-auto-sync-btn" id="karaoke-auto-sync-btn" title="AI-powered word-level speech recognition and forced alignment (Whisper)">
+                    <button type="button" class="karaoke-auto-sync-btn" id="karaoke-auto-sync-btn" title="AI-powered word-level speech recognition and forced alignment (Whisper in background worker)">
                       <span aria-hidden="true">&#9889;</span>
                       <span data-i18n="karaoke_auto_sync_button">⚡ Auto-Sync with AI (Whisper)</span>
+                    </button>
+                    <button type="button" class="karaoke-prepare-btn" id="karaoke-dsp-sync-btn" title="Instant acoustic rhythm alignment without downloading AI">
+                      <span aria-hidden="true">&#127926;</span>
+                      <span data-i18n="karaoke_dsp_sync_button">Fast DSP Sync</span>
                     </button>
                     <button type="button" class="karaoke-prepare-btn" id="karaoke-prepare-btn">
                       <span aria-hidden="true">&#9881;</span>

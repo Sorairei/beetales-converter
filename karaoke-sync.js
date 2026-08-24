@@ -778,31 +778,33 @@ export function detectAudioOnsets(channelData, sampleRate = 44100, options = {})
 }
 
 /**
- * Identifies active vocal segments using adaptive percentile-based VAD with hysteresis.
- * Ignores instrumental intros, solos, and interludes while preserving natural singing phrasing.
+ * Identifies active vocal segments using adaptive percentile-based VAD with hysteresis
+ * and syllabic rate envelope modulation (2Hz - 8Hz) to differentiate human voice from instrumental intros.
  * @param {Float32Array|Array<number>} channelData - Bandpass-filtered PCM audio samples
  * @param {number} [sampleRate=44100] - Sampling rate in Hz
  * @param {number} [duration=30] - Total duration in seconds
- * @param {Object} [options] - Tuning parameters
+ * @param {Object} [options] - Tuning parameters (e.g. sensitivity, startTime)
  * @returns {Array<Object>} List of vocal segment ranges [{ start: number, end: number }]
  */
 export function calculateVocalSegments(channelData, sampleRate = 44100, duration = 30, options = {}) {
   if (!channelData || !channelData.length || duration <= 0) {
-    const leadIn = Math.min(1.0, duration * 0.05);
+    const leadIn = options.startTime !== undefined && options.startTime > 0 ? Number(options.startTime) : Math.min(1.0, duration * 0.05);
     const leadOut = Math.max(0.5, duration * 0.05);
     return [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
   }
 
-  const frameMs = 25; // 25ms frames
-  const hopMs = 15;   // 15ms hop
+  const frameMs = 20; // 20ms frames
+  const hopMs = 10;   // 10ms hop
   const frameSize = Math.max(64, Math.floor(sampleRate * (frameMs / 1000)));
   const hopSize = Math.max(32, Math.floor(sampleRate * (hopMs / 1000)));
   const totalFrames = Math.floor((channelData.length - frameSize) / hopSize);
 
   if (totalFrames <= 0) {
-    return [{ start: 0.5, end: Math.max(1.5, duration - 0.5) }];
+    const s = options.startTime || 0.5;
+    return [{ start: s, end: Math.max(s + 1.5, duration - 0.5) }];
   }
 
+  // 1. Compute RMS energy per frame
   const energies = new Float32Array(totalFrames);
   for (let f = 0; f < totalFrames; f++) {
     const offset = f * hopSize;
@@ -814,7 +816,7 @@ export function calculateVocalSegments(channelData, sampleRate = 44100, duration
     energies[f] = Math.sqrt(sumSq / frameSize);
   }
 
-  // Sample energies for percentile estimation
+  // 2. Percentile analysis for dynamic range
   const sampleStep = Math.max(1, Math.floor(totalFrames / 3000));
   const sampled = [];
   for (let i = 0; i < totalFrames; i += sampleStep) {
@@ -826,13 +828,48 @@ export function calculateVocalSegments(channelData, sampleRate = 44100, duration
   const p85 = sampled[Math.floor(sampled.length * 0.85)] || 0;
   const dynamicRange = Math.max(1e-4, p85 - p15);
 
-  const sensitivity = options.sensitivity || 1.0;
-  // Adaptive thresholds with hysteresis
-  const tOn = Math.max(0.006, p15 + dynamicRange * (0.22 / sensitivity));
-  const tOff = Math.max(0.003, p15 + dynamicRange * (0.10 / sensitivity));
+  const sensitivity = Math.max(0.2, Math.min(3.0, options.sensitivity || 1.0));
+  const tOn = Math.max(0.005, p15 + dynamicRange * (0.18 / sensitivity));
+  const tOff = Math.max(0.002, p15 + dynamicRange * (0.08 / sensitivity));
 
-  const maxSilenceFrames = Math.floor(0.35 / (hopMs / 1000)); // 350ms silence triggers segment split
+  // 3. Compute Syllabic Envelope Modulation (2Hz - 8Hz) to differentiate voice from instrumental intro
+  const modWindow = Math.floor(1000 / hopMs); // ~1.0s window
+  const halfMod = Math.floor(modWindow / 2);
+  const voiceConfidence = new Float32Array(totalFrames);
+
+  for (let f = 0; f < totalFrames; f++) {
+    const startW = Math.max(0, f - halfMod);
+    const endW = Math.min(totalFrames - 1, f + halfMod);
+    const count = endW - startW + 1;
+
+    let mean = 0;
+    for (let i = startW; i <= endW; i++) mean += energies[i];
+    mean /= (count || 1);
+
+    let variance = 0;
+    let localPeaks = 0;
+    for (let i = startW; i <= endW; i++) {
+      const diff = energies[i] - mean;
+      variance += diff * diff;
+      if (i > startW && i < endW && energies[i] > energies[i - 1] && energies[i] >= energies[i + 1] && energies[i] > mean * 1.08) {
+        localPeaks++;
+      }
+    }
+    const stdDev = Math.sqrt(variance / (count || 1));
+    const cv = stdDev / (mean + 1e-4); // Coefficient of variation (vocal fluctuation)
+    const peaksPerSec = (localPeaks / count) * (1000 / hopMs);
+
+    // Human speech/singing has 1.5 - 8.5 syllables/sec and high envelope variation
+    const isSyllabic = peaksPerSec >= 1.2 && peaksPerSec <= 9.0;
+    const syllabicScore = isSyllabic ? 1.0 : (peaksPerSec > 9.0 ? 0.6 : 0.35);
+    const energyScore = energies[f] >= tOn ? 1.0 : (energies[f] >= tOff ? 0.5 : 0.0);
+
+    voiceConfidence[f] = energyScore * Math.min(1.2, cv * 1.6) * syllabicScore;
+  }
+
+  // 4. Extract voice segments with hysteresis
   const minSegFrames = Math.floor(0.20 / (hopMs / 1000));     // Min 200ms duration
+  const maxSilenceFrames = Math.floor(0.38 / (hopMs / 1000)); // 380ms silence triggers break
 
   const rawSegments = [];
   let inVoice = false;
@@ -840,7 +877,10 @@ export function calculateVocalSegments(channelData, sampleRate = 44100, duration
   let silenceFrames = 0;
 
   for (let f = 0; f < totalFrames; f++) {
-    const isVoice = inVoice ? energies[f] >= tOff : energies[f] >= tOn;
+    const isVoice = inVoice
+      ? (energies[f] >= tOff && (voiceConfidence[f] >= 0.15 || energies[f] >= tOn))
+      : (energies[f] >= tOn && voiceConfidence[f] >= 0.25);
+
     if (isVoice) {
       if (!inVoice) {
         inVoice = true;
@@ -867,7 +907,6 @@ export function calculateVocalSegments(channelData, sampleRate = 44100, duration
     }
   }
 
-  // Handle segment that reaches end of audio
   if (inVoice && totalFrames - segStartFrame >= minSegFrames) {
     rawSegments.push({
       start: Math.max(0, Number(((segStartFrame * hopSize) / sampleRate).toFixed(2))),
@@ -875,22 +914,40 @@ export function calculateVocalSegments(channelData, sampleRate = 44100, duration
     });
   }
 
+  // Fallback: If no high-confidence segment was found, locate first prominent energy onset
   if (!rawSegments.length) {
-    const leadIn = Math.min(1.0, duration * 0.05);
-    const leadOut = Math.max(0.5, duration * 0.05);
-    return [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
+    let firstBurst = 0;
+    for (let f = 0; f < totalFrames; f++) {
+      if (energies[f] >= tOn) {
+        firstBurst = (f * hopSize) / sampleRate;
+        break;
+      }
+    }
+    const start = Math.max(0.5, firstBurst);
+    rawSegments.push({ start, end: Math.max(start + 2, duration - 0.5) });
   }
 
-  // Merge segments with very short gaps (< 250ms) to maintain fluid singing phrases
+  // Merge segments with short breath gaps (< 280ms)
   const mergedSegments = [rawSegments[0]];
   for (let i = 1; i < rawSegments.length; i++) {
     const prev = mergedSegments[mergedSegments.length - 1];
     const curr = rawSegments[i];
-    if (curr.start - prev.end <= 0.25) {
+    if (curr.start - prev.end <= 0.28) {
       prev.end = Math.max(prev.end, curr.end);
     } else {
       mergedSegments.push(curr);
     }
+  }
+
+  // 5. Apply explicit startTime anchor if requested (e.g. user set start / playhead time)
+  if (options.startTime !== undefined && options.startTime > 0) {
+    const minStart = Number(options.startTime);
+    const filtered = mergedSegments.filter((s) => s.end > minStart);
+    if (filtered.length) {
+      if (filtered[0].start < minStart) filtered[0].start = minStart;
+      return filtered;
+    }
+    return [{ start: minStart, end: Math.max(minStart + 2, duration - 0.5) }];
   }
 
   return mergedSegments;

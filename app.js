@@ -1763,6 +1763,55 @@ function drawWaveform() {
   }
 }
 
+/**
+ * Reliably decodes audio buffer from any media file (Video MP4/WebM/MKV or Audio MP3/WAV/AAC/OGG)
+ * using Web Audio API with automatic FFmpeg.wasm extraction fallback.
+ */
+async function getMediaAudioBuffer(file) {
+  if (audioBuffer) return audioBuffer;
+  if (!file) return null;
+
+  // 1. Try direct AudioContext decoding (fast for pure audio like MP3, WAV, AAC)
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(arrayBuffer);
+    if (decoded && decoded.length > 0) {
+      audioBuffer = decoded;
+      return decoded;
+    }
+  } catch (err) {
+    // Expected to fail on video containers in most browsers (MP4/MKV/MOV)
+  }
+
+  // 2. Fallback: Extract lightweight mono 22050Hz WAV with ffmpeg.wasm
+  try {
+    setStatus("⚡ Extracting audio track with ffmpeg.wasm for voice onset analysis...");
+    await loadFfmpeg();
+    const ext = getFileExtension(file.name) || "media";
+    const inName = `sync_tmp_in_${Date.now()}.${ext}`;
+    const outName = `sync_tmp_out_${Date.now()}.wav`;
+
+    await ffmpeg.writeFile(inName, await fetchFile(file));
+    await ffmpeg.exec(["-hide_banner", "-y", "-i", inName, "-vn", "-ac", "1", "-ar", "22050", "-f", "wav", outName]);
+    const wavBytes = await ffmpeg.readFile(outName);
+
+    await ffmpeg.deleteFile(inName).catch(() => {});
+    await ffmpeg.deleteFile(outName).catch(() => {});
+
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await ctx.decodeAudioData(wavBytes.buffer);
+    if (decoded) {
+      audioBuffer = decoded;
+      return decoded;
+    }
+  } catch (ffmpegErr) {
+    console.warn("FFmpeg audio extraction failed:", ffmpegErr);
+  }
+
+  return null;
+}
+
 async function decodeAudio(file) {
   if (decodeAbortController) decodeAbortController.abort();
   decodeAbortController = new AbortController();
@@ -1773,19 +1822,15 @@ async function decodeAudio(file) {
     audioContext = null;
   }
 
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  audioContext = ctx;
-
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    if (signal.aborted) return;
-    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    if (signal.aborted) return;
-    waveformReady = true;
-    waveformCanvas.width = waveformCanvas.clientWidth * (window.devicePixelRatio || 1);
-    waveformCanvas.height = waveformCanvas.clientHeight * (window.devicePixelRatio || 1);
-    waveformCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-    drawWaveform();
+    const buf = await getMediaAudioBuffer(file);
+    if (buf && !signal.aborted) {
+      waveformReady = true;
+      waveformCanvas.width = waveformCanvas.clientWidth * (window.devicePixelRatio || 1);
+      waveformCanvas.height = waveformCanvas.clientHeight * (window.devicePixelRatio || 1);
+      waveformCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+      drawWaveform();
+    }
   } catch (err) {
     if (!signal.aborted) console.warn("Audio decode failed:", err);
   }
@@ -2395,31 +2440,28 @@ function initKaraokeStudio() {
       }
 
       clearError();
-      setStatus("⚡ Analyzing audio waveform energy and vocal pauses for auto-synchronization...");
+      setStatus("⚡ Analyzing audio waveform, voice onsets and intro pauses...");
 
       // 1. Obtain audio data from decoded audioBuffer or decode active file
-      let targetBuffer = audioBuffer;
-      if (!targetBuffer && selectedFiles[0]) {
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const arrayBuffer = await selectedFiles[0].arrayBuffer();
-          targetBuffer = await ctx.decodeAudioData(arrayBuffer);
-          audioBuffer = targetBuffer;
-        } catch (e) {
-          console.warn("Could not decode audio for auto-sync:", e);
-        }
-      }
+      const activeFile = selectedFiles[0];
+      const targetBuffer = await getMediaAudioBuffer(activeFile);
+      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
 
-      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(selectedFiles[0])?.duration) || 30;
+      // Check if user has paused video at a custom start position (>1.0s)
+      const previewTime = videoPreview?.currentTime || 0;
+      const startOption = previewTime > 1.5 ? previewTime : undefined;
 
       const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
         leadInOffset: 0.12,
         snapToOnsets: true,
+        startTime: startOption,
       });
       karaokeEngine.setWords(alignedWords);
       renderWordChipsQueue();
       updateSubtitleOverlay();
-      setStatus(`⚡ Auto-aligned ${alignedWords.length} words with voice onset & tempo! Play preview or adjust with ±0.2s.`);
+
+      const firstWordStart = alignedWords[0]?.start ?? 0;
+      setStatus(`⚡ Auto-aligned ${alignedWords.length} words! First vocal starts at ${formatDuration(firstWordStart)}.`);
     });
   }
 

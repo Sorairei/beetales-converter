@@ -358,4 +358,39 @@ test("autoAlignLyricsWithAudio supports Web Audio API AudioBuffer interface with
   assert.ok(aligned[aligned.length - 1].end <= duration);
 });
 
+test("autoAlignLyricsWithAudio correctly respects delayed vocal entrance and avoids starting at 0:00", () => {
+  const lyrics = "De carácter fuerte y de humilde cuna\nTrabajó la tierra que era su fortuna";
+  const words = splitLyricsIntoWords(lyrics, { wordsPerBlock: 4 });
+
+  const sampleRate = 44100;
+  const duration = 30; // 30s track
+  const channelData = new Float32Array(sampleRate * duration);
+
+  // 0s to 12s: intro with low steady drone (no syllabic voice modulation)
+  for (let i = 0; i < sampleRate * 12; i++) {
+    channelData[i] = Math.sin(2 * Math.PI * 100 * (i / sampleRate)) * 0.05;
+  }
+
+  // 12s to 26s: voice entrance with vocal formants and syllabic amplitude modulation
+  for (let i = sampleRate * 12; i < sampleRate * 26; i++) {
+    const t = i / sampleRate;
+    const syllabicMod = 0.5 + 0.5 * Math.sin(2 * Math.PI * 4 * t); // 4Hz syllabic rate
+    channelData[i] = Math.sin(2 * Math.PI * 650 * t) * 0.6 * syllabicMod;
+  }
+
+  const aligned = autoAlignLyricsWithAudio(words, { channelData, sampleRate, duration }, {
+    leadInOffset: 0.12,
+    snapToOnsets: true,
+  });
+
+  assert.equal(aligned.length, words.length);
+  // The first word should NOT start at 0:00. It must start at or near the 12s vocal entrance (>= 11.5s)
+  assert.ok(
+    aligned[0].start >= 11.5,
+    `First word "De" must start near 12s vocal entrance, but started at: ${aligned[0].start}s`
+  );
+  assert.ok(aligned[aligned.length - 1].end <= duration);
+});
+
+
 

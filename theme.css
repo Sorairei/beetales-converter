@@ -367,8 +367,10 @@ legend,
    -------------------------------------------------------------------------- */
 
 .crop-container {
+  position: relative;
   border-radius: 6px;
   background: #020804;
+  overflow: hidden;
 }
 
 .crop-box    { border-color: var(--accent-strong); }
@@ -463,7 +465,8 @@ legend,
    -------------------------------------------------------------------------- */
 
 .mp4-note,
-.gif-note {
+.gif-note,
+.karaoke-note {
   border-color: rgba(74, 138, 40, 0.28);
   background: rgba(74, 138, 40, 0.07);
   color: var(--text);
@@ -850,6 +853,462 @@ select:focus-visible {
   color: var(--accent-strong);
 }
 
+/* ==========================================================================
+   Sprint 5 — Karaoke & Dynamic Subtitles Studio Theme
+   ========================================================================== */
 
+.karaoke-settings {
+  display: grid;
+  gap: 18px;
+}
 
+.karaoke-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
+.karaoke-tabs-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(42, 80, 48, 0.55);
+  padding-bottom: 10px;
+}
+
+.karaoke-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.karaoke-tab-btn:hover {
+  color: var(--text-strong);
+  background: rgba(110, 200, 50, 0.08);
+}
+
+.karaoke-tab-btn.is-active {
+  background: rgba(110, 200, 50, 0.16);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.karaoke-lyrics-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 12px;
+  resize: vertical;
+  min-height: 90px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.karaoke-lyrics-textarea:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 12px rgba(110, 200, 50, 0.25);
+}
+
+.karaoke-paste-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.karaoke-words-select-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.karaoke-prepare-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--text-strong);
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.karaoke-prepare-btn:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.14);
+  color: var(--accent-strong);
+}
+
+/* Sincronizador Tap-to-Sync */
+.karaoke-sync-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.karaoke-sync-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--amber-strong);
+}
+
+.karaoke-words-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.karaoke-empty-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.word-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.word-chip:hover {
+  border-color: var(--line-strong);
+  color: var(--text-strong);
+}
+
+.word-chip.is-active {
+  background: rgba(245, 166, 35, 0.22);
+  border-color: var(--amber-strong);
+  color: #FFE600;
+  transform: scale(1.06);
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.35);
+}
+
+.word-chip.is-synced {
+  background: rgba(110, 200, 50, 0.15);
+  border-color: rgba(110, 200, 50, 0.6);
+  color: var(--accent-strong);
+}
+
+.word-chip .chip-time {
+  font-size: 0.68rem;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.karaoke-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.karaoke-tap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  border: none;
+  color: var(--accent-ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(110, 200, 50, 0.35);
+  transition: transform 0.1s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.karaoke-tap-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px rgba(110, 200, 50, 0.5);
+}
+
+.karaoke-tap-btn:not(:disabled):active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.karaoke-tap-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tap-key-badge {
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.karaoke-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.karaoke-ctrl-btn:not(:disabled):hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.karaoke-ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.karaoke-sync-stat {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.karaoke-sync-stat strong {
+  color: var(--text-strong);
+}
+
+/* Style Presets */
+.karaoke-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.karaoke-preset-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.karaoke-preset-card:hover {
+  border-color: var(--line-strong);
+  background: var(--panel-soft);
+}
+
+.karaoke-preset-card.is-active {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.1);
+  box-shadow: 0 0 12px rgba(110, 200, 50, 0.2);
+}
+
+.preset-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+
+.karaoke-preset-card.is-active .preset-badge {
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+}
+
+.karaoke-preset-card strong {
+  font-size: 0.85rem;
+  color: var(--text-strong);
+  margin-bottom: 2px;
+}
+
+.karaoke-preset-card small {
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+/* Custom Controls */
+.karaoke-custom-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.custom-control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.custom-control-item label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.karaoke-color-picker {
+  height: 38px;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.custom-control-checkbox {
+  justify-content: flex-end;
+}
+
+/* Export Buttons */
+.karaoke-export-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.karaoke-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.karaoke-export-btn:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.15);
+  color: var(--accent-strong);
+}
+
+/* ==========================================================================
+   Dynamic Subtitle Overlay (Live Playback Video Player)
+   ========================================================================== */
+
+.dynamic-subtitle-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.dynamic-subtitle-overlay.pos-top {
+  align-items: flex-start;
+  padding-top: 32px;
+}
+
+.dynamic-subtitle-overlay.pos-middle {
+  align-items: center;
+}
+
+.dynamic-subtitle-overlay.pos-bottom {
+  align-items: flex-end;
+  padding-bottom: 32px;
+}
+
+.dynamic-subtitle-box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 14px;
+  text-align: center;
+  max-width: 90%;
+  pointer-events: none;
+}
+
+.sub-word {
+  display: inline-block;
+  font-weight: 900;
+  line-height: 1.1;
+  transition: transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.12s ease;
+  will-change: transform, color;
+}
+
+.sub-word.active {
+  transform: scale(1.18);
+  z-index: 2;
+  animation: subPop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes subPop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}

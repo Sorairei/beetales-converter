@@ -6,14 +6,14 @@
     <title>BeeTales Media Converter</title>
     <meta
       name="description"
-      content="Convert video files locally in your browser with ffmpeg.wasm. Extract audio, convert WebM, or optimize MP4 without uploading files."
+      content="Convert video files locally in your browser with ffmpeg.wasm. Extract audio, convert WebM, create GIFs, or generate dynamic TikTok/Karaoke subtitles without uploading files."
     />
     <meta name="theme-color" content="#050b07" />
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-i18n-complete" />
-    <link rel="stylesheet" href="theme.css?v=20260823-i18n-complete" />
+    <link rel="stylesheet" href="style.css?v=20260824-karaoke-studio" />
+    <link rel="stylesheet" href="theme.css?v=20260824-karaoke-studio" />
   </head>
   <body>
     <main class="app-shell">
@@ -49,6 +49,8 @@
             <span>AAC</span>
             <span>MP4</span>
             <span>GIF</span>
+            <span>KARAOKE</span>
+            <span>TIKTOK</span>
           </div>
 
           <!-- Language Selector & User Guide Bar -->
@@ -118,6 +120,13 @@
                   <small data-i18n="mode_gif_desc">Create a short animated GIF with trim and crop options</small>
                 </span>
               </label>
+              <label>
+                <input type="radio" name="mode" value="karaoke" />
+                <span>
+                  <strong data-i18n="mode_karaoke_title">Subtitles & Karaoke</strong>
+                  <small data-i18n="mode_karaoke_desc">TikTok/Shorts captions, dynamic word highlight & karaoke sync</small>
+                </span>
+              </label>
             </div>
           </fieldset>
 
@@ -140,7 +149,7 @@
           </div>
 
           <label class="drop-zone" for="video-file" id="drop-zone">
-            <input id="video-file" name="video-file" type="file" accept="video/*,.webm" multiple />
+            <input id="video-file" name="video-file" type="file" accept="video/*,audio/*,.webm,.mp4,.mp3,.wav,.m4a,.ogg" multiple />
             <span class="drop-icon" aria-hidden="true"></span>
             <span class="drop-title" id="drop-title" data-i18n="drop_title">Select one or more video files</span>
             <span class="drop-hint" id="drop-hint" data-i18n="drop_hint">You can also drag and drop them here</span>
@@ -166,6 +175,12 @@
             </div>
             <div class="crop-container" id="crop-container">
               <video id="video-preview" controls preload="none"></video>
+              
+              <!-- Dynamic Subtitle Overlay for Real-time Playback -->
+              <div class="dynamic-subtitle-overlay is-hidden" id="dynamic-subtitle-overlay" aria-live="off">
+                <div class="dynamic-subtitle-box" id="dynamic-subtitle-box"></div>
+              </div>
+
               <div class="frame-nav" id="frame-nav">
                 <button class="frame-nav-button" id="frame-prev" type="button" aria-label="Previous frame" title="Previous frame">&#9664;</button>
                 <button class="frame-nav-button" id="frame-next" type="button" aria-label="Next frame" title="Next frame">&#9654;</button>
@@ -326,25 +341,6 @@
             </fieldset>
           </div>
 
-          <fieldset class="trim-settings">
-            <legend data-i18n="trim_legend">Trim (optional)</legend>
-            <div class="time-grid">
-              <label>
-                <span data-i18n="start_time">Start time</span>
-                <input id="trim-start" name="trim-start" type="text" inputmode="numeric" placeholder="00:00" autocomplete="off" />
-              </label>
-              <label>
-                <span data-i18n="end_time">End time</span>
-                <input id="trim-end" name="trim-end" type="text" inputmode="numeric" placeholder="Full length" autocomplete="off" />
-              </label>
-            </div>
-            <p class="setting-help" data-i18n="trim_help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
-          </fieldset>
-
-          <div class="mp4-note is-hidden" id="mp4-note" data-i18n="mp4_note">
-            MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
-          </div>
-
           <div class="settings-grid gif-settings is-hidden" id="gif-settings">
             <fieldset>
               <legend data-i18n="output_format">Output format</legend>
@@ -387,8 +383,205 @@
             </fieldset>
           </div>
 
+          <!-- Karaoke & Dynamic Subtitles Studio -->
+          <div class="settings-grid karaoke-settings is-hidden" id="karaoke-settings">
+            <!-- Studio Input Mode -->
+            <fieldset class="settings-full karaoke-input-fieldset">
+              <legend data-i18n="karaoke_studio_title">Lyrics & Synchronization Studio</legend>
+              <div class="karaoke-input-container">
+                <div class="karaoke-tabs-bar">
+                  <button type="button" class="karaoke-tab-btn is-active" id="karaoke-tab-paste" data-i18n="karaoke_paste_tab">Paste Lyrics / Script</button>
+                  <button type="button" class="karaoke-tab-btn" id="karaoke-tab-import" data-i18n="karaoke_import_tab">Import Subtitle (.lrc / .srt)</button>
+                </div>
+
+                <div class="karaoke-panel-paste" id="karaoke-panel-paste">
+                  <textarea id="karaoke-lyrics-input" class="karaoke-lyrics-textarea" rows="4" placeholder="Paste your lyrics or script here..."></textarea>
+                  <div class="karaoke-paste-tools">
+                    <div class="karaoke-words-select-group">
+                      <label for="karaoke-words-per-block" data-i18n="karaoke_words_per_block">Words per screen</label>
+                      <select id="karaoke-words-per-block" class="setting-select">
+                        <option value="1" data-i18n="karaoke_opt_1word">1 word (TikTok Fast Pop)</option>
+                        <option value="2" data-i18n="karaoke_opt_2words">2 words (Shorts Dynamic)</option>
+                        <option value="3" selected data-i18n="karaoke_opt_3words">3 words (Balanced)</option>
+                        <option value="5" data-i18n="karaoke_opt_5words">5 words (Karaoke Line)</option>
+                        <option value="12" data-i18n="karaoke_opt_full">Full lines (Natural)</option>
+                      </select>
+                    </div>
+                    <button type="button" class="karaoke-prepare-btn" id="karaoke-prepare-btn">
+                      <span aria-hidden="true">&#9881;</span>
+                      <span data-i18n="karaoke_parse_button">Prepare Words for Sync</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="karaoke-panel-import is-hidden" id="karaoke-panel-import">
+                  <label class="aux-file-button" for="karaoke-file-input">
+                    <span aria-hidden="true">&#128194;</span>
+                    <span data-i18n="karaoke_import_file_label">Upload .LRC or .SRT file</span>
+                    <input id="karaoke-file-input" type="file" accept=".lrc,.srt,.vtt,.ass,.json" />
+                  </label>
+                  <p class="setting-help">Supports standard Karaoke .LRC files and SubRip .SRT files with timestamps.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Sincronizador Interactivo (Tap-to-Sync) -->
+            <fieldset class="settings-full karaoke-sync-fieldset">
+              <legend data-i18n="karaoke_sync_title">Interactive Tap-to-Sync</legend>
+              <div class="karaoke-sync-dashboard">
+                <div class="karaoke-sync-banner">
+                  <span class="karaoke-sync-icon" aria-hidden="true">&#9658;</span>
+                  <span data-i18n="karaoke_sync_hint">Play the preview video above and tap [Space] or the green button on each beat/word to sync!</span>
+                </div>
+
+                <!-- Word chips interactive timeline/queue -->
+                <div class="karaoke-words-queue" id="karaoke-words-queue" role="region" aria-label="Words synchronization queue">
+                  <p class="karaoke-empty-hint">Paste lyrics above and click "Prepare Words for Sync" to start synchronizing.</p>
+                </div>
+
+                <!-- Live Sync Control Bar -->
+                <div class="karaoke-sync-actions">
+                  <button type="button" class="karaoke-tap-btn" id="karaoke-tap-btn" disabled>
+                    <span class="tap-key-badge">SPACE</span>
+                    <span data-i18n="karaoke_tap_button">Tap Word (Space)</span>
+                  </button>
+                  <button type="button" class="karaoke-ctrl-btn" id="karaoke-undo-btn" title="Undo last tap (Ctrl+Z)" disabled>
+                    <span aria-hidden="true">&#8630;</span>
+                    <span data-i18n="karaoke_undo_button">Undo</span>
+                  </button>
+                  <button type="button" class="karaoke-ctrl-btn" id="karaoke-reset-btn" title="Reset all timestamps" disabled>
+                    <span aria-hidden="true">&#8634;</span>
+                    <span data-i18n="karaoke_reset_button">Reset</span>
+                  </button>
+                  <div class="karaoke-sync-stat">
+                    <span data-i18n="karaoke_progress_label">Sync Progress:</span>
+                    <strong id="karaoke-sync-counter">0 / 0</strong>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Visual Style Studio & Customization -->
+            <fieldset class="settings-full karaoke-style-fieldset">
+              <legend data-i18n="karaoke_style_title">Visual Style & Animations</legend>
+              
+              <!-- Style presets grid -->
+              <div class="karaoke-presets-grid" id="karaoke-presets-grid">
+                <button type="button" class="karaoke-preset-card is-active" data-preset="tiktok">
+                  <div class="preset-badge">TIKTOK</div>
+                  <strong data-i18n="karaoke_preset_tiktok">TikTok Pop</strong>
+                  <small>Bright yellow bounce text with heavy black stroke</small>
+                </button>
+                <button type="button" class="karaoke-preset-card" data-preset="karaoke">
+                  <div class="preset-badge">KARAOKE</div>
+                  <strong data-i18n="karaoke_preset_karaoke">Karaoke Glow</strong>
+                  <small>Circuit green glow with progressive lyric lighting</small>
+                </button>
+                <button type="button" class="karaoke-preset-card" data-preset="mrbeast">
+                  <div class="preset-badge">SHORTS</div>
+                  <strong data-i18n="karaoke_preset_mrbeast">Creator / Shorts</strong>
+                  <small>High-impact bold text with neon active highlight</small>
+                </button>
+                <button type="button" class="karaoke-preset-card" data-preset="cinematic">
+                  <div class="preset-badge">CLEAN</div>
+                  <strong data-i18n="karaoke_preset_cinematic">Cinematic Clean</strong>
+                  <small>Minimalist white text with soft gradient shadow</small>
+                </button>
+              </div>
+
+              <!-- Customization fields -->
+              <div class="karaoke-custom-controls">
+                <div class="custom-control-item">
+                  <label for="karaoke-font-family" data-i18n="karaoke_font_family">Font</label>
+                  <select id="karaoke-font-family" class="setting-select">
+                    <option value="'Montserrat', 'Arial Black', sans-serif" selected>Montserrat Black (Modern)</option>
+                    <option value="'Impact', 'Arial Black', sans-serif">Impact (Punchy)</option>
+                    <option value="'Outfit', sans-serif">Outfit (Clean)</option>
+                    <option value="system-ui, sans-serif">System Sans (Minimal)</option>
+                  </select>
+                </div>
+                <div class="custom-control-item">
+                  <label for="karaoke-font-size" data-i18n="karaoke_font_size">Font size</label>
+                  <select id="karaoke-font-size" class="setting-select">
+                    <option value="32">Small · 32px</option>
+                    <option value="42">Medium · 42px</option>
+                    <option value="48" selected>Large · 48px</option>
+                    <option value="56">Extra Large · 56px</option>
+                  </select>
+                </div>
+                <div class="custom-control-item">
+                  <label for="karaoke-primary-color" data-i18n="karaoke_primary_color">Text color</label>
+                  <input type="color" id="karaoke-primary-color" class="karaoke-color-picker" value="#FFFFFF" />
+                </div>
+                <div class="custom-control-item">
+                  <label for="karaoke-active-color" data-i18n="karaoke_active_color">Active highlight</label>
+                  <input type="color" id="karaoke-active-color" class="karaoke-color-picker" value="#FFE600" />
+                </div>
+                <div class="custom-control-item">
+                  <label for="karaoke-position" data-i18n="karaoke_position">Position</label>
+                  <select id="karaoke-position" class="setting-select">
+                    <option value="top" data-i18n="karaoke_pos_top">Top</option>
+                    <option value="middle" selected data-i18n="karaoke_pos_middle">Middle (TikTok/Shorts)</option>
+                    <option value="bottom" data-i18n="karaoke_pos_bottom">Bottom (Karaoke)</option>
+                  </select>
+                </div>
+                <div class="custom-control-item custom-control-checkbox">
+                  <label class="loudness-toggle" for="karaoke-uppercase">
+                    <input type="checkbox" id="karaoke-uppercase" checked />
+                    <span class="toggle-thumb" aria-hidden="true"></span>
+                    <span class="loudness-label">
+                      <strong data-i18n="karaoke_uppercase">Uppercase all words</strong>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Export subtitle files toolbar -->
+            <fieldset class="settings-full karaoke-export-fieldset">
+              <legend data-i18n="karaoke_export_title">Export Options</legend>
+              <div class="karaoke-export-buttons">
+                <button type="button" class="karaoke-export-btn" id="karaoke-dl-lrc">
+                  <span aria-hidden="true">&#9835;</span>
+                  <span data-i18n="karaoke_export_lrc">Download .LRC (Karaoke)</span>
+                </button>
+                <button type="button" class="karaoke-export-btn" id="karaoke-dl-srt">
+                  <span aria-hidden="true">&#9776;</span>
+                  <span data-i18n="karaoke_export_srt">Download .SRT (Subtitles)</span>
+                </button>
+                <button type="button" class="karaoke-export-btn" id="karaoke-dl-ass">
+                  <span aria-hidden="true">&#9733;</span>
+                  <span data-i18n="karaoke_export_ass">Download .ASS (Styled)</span>
+                </button>
+              </div>
+            </fieldset>
+          </div>
+
+          <fieldset class="trim-settings">
+            <legend data-i18n="trim_legend">Trim (optional)</legend>
+            <div class="time-grid">
+              <label>
+                <span data-i18n="start_time">Start time</span>
+                <input id="trim-start" name="trim-start" type="text" inputmode="numeric" placeholder="00:00" autocomplete="off" />
+              </label>
+              <label>
+                <span data-i18n="end_time">End time</span>
+                <input id="trim-end" name="trim-end" type="text" inputmode="numeric" placeholder="Full length" autocomplete="off" />
+              </label>
+            </div>
+            <p class="setting-help" data-i18n="trim_help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
+          </fieldset>
+
+          <div class="mp4-note is-hidden" id="mp4-note" data-i18n="mp4_note">
+            MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
+          </div>
+
           <div class="gif-note is-hidden" id="gif-note" data-i18n="gif_note">
             GIF clips are limited to 15 seconds to protect browser memory. Use Trim to choose the best moment.
+          </div>
+
+          <div class="karaoke-note is-hidden" id="karaoke-note" data-i18n="karaoke_note">
+            Video rendering with burned animated subtitles runs 100% in your browser using ffmpeg.wasm.
           </div>
 
           <div class="actions">
@@ -492,9 +685,9 @@
               <div class="guide-card">
                 <h4 data-i18n="guide_card_workflow_title">Quick Workflow</h4>
                 <ol>
-                  <li data-i18n="guide_card_workflow_step1">1. Choose your Conversion Mode (Audio, MP4, or GIF).</li>
+                  <li data-i18n="guide_card_workflow_step1">1. Choose your Conversion Mode (Audio, MP4, GIF, or Subtitles & Karaoke).</li>
                   <li data-i18n="guide_card_workflow_step2">2. Drag and drop your video files into the dropzone.</li>
-                  <li data-i18n="guide_card_workflow_step3">3. Customize settings (Quality, Loudness, Speed, Subtitles).</li>
+                  <li data-i18n="guide_card_workflow_step3">3. Customize settings (Quality, Loudness, Lyrics, Visual Styles).</li>
                   <li data-i18n="guide_card_workflow_step4">4. Click Convert and download your files.</li>
                 </ol>
               </div>
@@ -520,6 +713,10 @@
               <h4 data-i18n="mode_gif_title">Video to GIF</h4>
               <p data-i18n="guide_sec_modes_gif">• Video to GIF / WebP: Generates smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.</p>
             </div>
+            <div class="guide-item-block">
+              <h4 data-i18n="mode_karaoke_title">Subtitles & Karaoke</h4>
+              <p data-i18n="guide_sec_modes_karaoke">• Subtitles & Karaoke Studio: Create TikTok/Shorts pop captions or Karaoke videos. Paste lyrics, sync in real-time with spacebar, and burn styled subtitles into MP4.</p>
+            </div>
           </div>
 
           <!-- Audio Tab -->
@@ -540,7 +737,7 @@
             <h3 data-i18n="guide_sec_features_h3">Advanced Video Tools</h3>
             <ul class="guide-feature-list">
               <li data-i18n="guide_sec_speed">• Speed Control: Slow down video (0.25×, 0.5×, 0.75×) or speed it up (1.5×, 2×) with automatic audio pitch and tempo synchronization.</li>
-              <li data-i18n="guide_sec_subs">• Subtitle Burn-In (.srt / .vtt): Hardcodes subtitles directly into the video stream with styled borders and crisp readability.</li>
+              <li data-i18n="guide_sec_subs">• Subtitle Burn-In (.srt / .vtt / .ass): Hardcodes subtitles directly into the video stream with styled borders and crisp readability.</li>
               <li data-i18n="guide_sec_audio_replace">• Replace Audio Track: Lets you add a custom music track (.mp3, .wav) to mute the background noise or create music videos.</li>
               <li data-i18n="guide_sec_color">• Color & Style Filters: Apply quick contrast, vivid saturation, black & white, or cinematic warm grading with zero rendering lag.</li>
               <li data-i18n="guide_sec_save_frame">• Save Frame (JPEG): Instantly snapshot the current frame at full resolution without waiting for video processing.</li>
@@ -567,6 +764,6 @@
       </div>
     </div>
 
-    <script type="module" src="app.js?v=20260717-conversion-lock"></script>
+    <script type="module" src="app.js?v=20260824-karaoke-studio"></script>
   </body>
 </html>

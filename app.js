@@ -11,6 +11,16 @@ import {
   safeBaseName,
 } from "./converter-utils.js";
 import { translations } from "./translations.js";
+import {
+  SUBTITLE_PRESETS,
+  splitLyricsIntoWords,
+  exportAss,
+  exportSrt,
+  exportLrc,
+  parseLrc,
+  parseSrt,
+  KaraokeSyncEngine,
+} from "./karaoke-sync.js";
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#converter-form");
@@ -49,7 +59,7 @@ const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed, #mp4-audio-track, #mp4-color-filter');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed, #mp4-audio-track, #mp4-color-filter, #karaoke-font-family, #karaoke-font-size, #karaoke-primary-color, #karaoke-active-color, #karaoke-position, #karaoke-uppercase');
 
 const cropContainer = $("#crop-container");
 const cropOverlay = $("#crop-overlay");
@@ -71,7 +81,7 @@ const waveformCanvas = $("#waveform-canvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const waveformCtx = waveformCanvas.getContext("2d");
 
-// Sprint 1, 2 & 3 new feature DOM refs
+// Sprints DOM refs
 const saveFrameBar = $("#save-frame-bar");
 const saveFrameButton = $("#save-frame-button");
 const presetsList = $("#presets-list");
@@ -114,6 +124,35 @@ const guideClose = $("#guide-close");
 const guideCloseBtn = $("#guide-close-btn");
 const guideTabs = document.querySelectorAll(".guide-tab-button");
 const guidePanes = document.querySelectorAll(".guide-pane");
+
+// Karaoke & Dynamic Subtitles DOM refs
+const karaokeSettings = $("#karaoke-settings");
+const karaokeNote = $("#karaoke-note");
+const karaokeTabPaste = $("#karaoke-tab-paste");
+const karaokeTabImport = $("#karaoke-tab-import");
+const karaokePanelPaste = $("#karaoke-panel-paste");
+const karaokePanelImport = $("#karaoke-panel-import");
+const karaokeLyricsInput = $("#karaoke-lyrics-input");
+const karaokeWordsPerBlock = $("#karaoke-words-per-block");
+const karaokePrepareBtn = $("#karaoke-prepare-btn");
+const karaokeFileInput = $("#karaoke-file-input");
+const karaokeWordsQueue = $("#karaoke-words-queue");
+const karaokeTapBtn = $("#karaoke-tap-btn");
+const karaokeUndoBtn = $("#karaoke-undo-btn");
+const karaokeResetBtn = $("#karaoke-reset-btn");
+const karaokeSyncCounter = $("#karaoke-sync-counter");
+const karaokePresetCards = document.querySelectorAll(".karaoke-preset-card");
+const karaokeFontFamily = $("#karaoke-font-family");
+const karaokeFontSize = $("#karaoke-font-size");
+const karaokePrimaryColor = $("#karaoke-primary-color");
+const karaokeActiveColor = $("#karaoke-active-color");
+const karaokePosition = $("#karaoke-position");
+const karaokeUppercase = $("#karaoke-uppercase");
+const karaokeDlLrc = $("#karaoke-dl-lrc");
+const karaokeDlSrt = $("#karaoke-dl-srt");
+const karaokeDlAss = $("#karaoke-dl-ass");
+const dynamicSubtitleOverlay = $("#dynamic-subtitle-overlay");
+const dynamicSubtitleBox = $("#dynamic-subtitle-box");
 
 const LANG_KEY = "beetales-lang-v1";
 let currentLang = localStorage.getItem(LANG_KEY) || "en";
@@ -159,14 +198,25 @@ let trimOverlayHandle = null;
 let trimOverlayDragStartX = 0;
 let trimOverlayDragStartRange = null;
 let cachedAccentColor = "#91bd59";
-let decodeAbortController = null; // C-02: serialise concurrent decodeAudio calls
-let thumbnailAbortToken = 0; // C-03: incremented to cancel in-progress thumbnail generation
+let decodeAbortController = null;
+let thumbnailAbortToken = 0;
+
+// Karaoke Sync Engine Instance
+const karaokeEngine = new KaraokeSyncEngine();
+let activePresetId = "tiktok";
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
 const ffmpegCoreURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.js");
 const ffmpegWasmURL = localAssetURL("./vendor/ffmpeg/core/ffmpeg-core.wasm");
-const outputMimeTypes = { mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", mp4: "video/mp4", gif: "image/gif", webp: "image/webp" };
+const outputMimeTypes = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  aac: "audio/aac",
+  mp4: "video/mp4",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 const audioOutputArgs = {
   mp3: ["-vn", "-map", "0:a:0", "-codec:a", "libmp3lame", "-f", "mp3"],
   wav: ["-vn", "-map", "0:a:0", "-codec:a", "pcm_s16le", "-f", "wav"],
@@ -174,19 +224,44 @@ const audioOutputArgs = {
 };
 const modeContent = {
   audio: {
-    button: "Convert queue to audio", busy: "Extracting audio...", ready: "video(s) ready for audio extraction.",
-    empty: "Choose one or more videos to get started.", dropTitle: "Select one or more video files",
-    dropHint: "You can also drag and drop them here", accept: "video/*,.webm", download: "Download audio",
+    button: "Convert queue to audio",
+    busy: "Extracting audio...",
+    ready: "video(s) ready for audio extraction.",
+    empty: "Choose one or more videos to get started.",
+    dropTitle: "Select one or more video files",
+    dropHint: "You can also drag and drop them here",
+    accept: "video/*,.webm",
+    download: "Download audio",
   },
   mp4: {
-    button: "Convert queue to MP4", busy: "Converting to MP4...", ready: "video(s) ready for MP4 conversion or optimization.",
-    empty: "Choose one or more WebM or MP4 videos to get started.", dropTitle: "Select WebM or MP4 videos",
-    dropHint: "Drop .webm or .mp4 files here or choose them from your device", accept: "video/webm,video/mp4,.webm,.mp4", download: "Download MP4",
+    button: "Convert queue to MP4",
+    busy: "Converting to MP4...",
+    ready: "video(s) ready for MP4 conversion or optimization.",
+    empty: "Choose one or more WebM or MP4 videos to get started.",
+    dropTitle: "Select WebM or MP4 videos",
+    dropHint: "Drop .webm or .mp4 files here or choose them from your device",
+    accept: "video/webm,video/mp4,.webm,.mp4",
+    download: "Download MP4",
   },
   gif: {
-    button: "Convert queue to GIF", busy: "Creating GIF...", ready: "video(s) ready for GIF creation.",
-    empty: "Choose one or more videos to create GIF clips.", dropTitle: "Select videos for GIF",
-    dropHint: "Choose a short clip with Trim for the best result", accept: "video/*,.webm,.mp4", download: "Download GIF",
+    button: "Convert queue to GIF",
+    busy: "Creating GIF...",
+    ready: "video(s) ready for GIF creation.",
+    empty: "Choose one or more videos to create GIF clips.",
+    dropTitle: "Select videos for GIF",
+    dropHint: "Choose a short clip with Trim for the best result",
+    accept: "video/*,.webm,.mp4",
+    download: "Download GIF",
+  },
+  karaoke: {
+    button: "Burn & Export MP4",
+    busy: "Generating subtitled video...",
+    ready: "video(s) ready for subtitle creation & burning.",
+    empty: "Select video or audio to start Karaoke & Subtitles.",
+    dropTitle: "Select video or audio for Karaoke / Subtitles",
+    dropHint: "Upload your video or song, then paste lyrics below to sync",
+    accept: "video/*,audio/*,.webm,.mp4,.mp3,.wav,.m4a,.ogg",
+    download: "Download Subtitled MP4",
   },
 };
 
@@ -227,10 +302,19 @@ timelineCanvas.addEventListener("mousemove", handleTimelineHover);
 timelineCanvas.addEventListener("mouseleave", handleTimelineHoverEnd);
 trimStart.addEventListener("input", handleTrimInputChange);
 trimEnd.addEventListener("input", handleTrimInputChange);
+
 videoPreview.addEventListener("timeupdate", () => {
   if (timelineReady) drawTimeline();
   if (waveformReady) drawWaveform();
+  if (getMode() === "karaoke") updateSubtitleOverlay();
 });
+
+videoPreview.addEventListener("seeked", () => {
+  if (getMode() === "karaoke") updateSubtitleOverlay();
+});
+
+// Initialize sub-modules
+initKaraokeStudio();
 restorePreferences();
 applyUrlParams();
 setLanguage(currentLang);
@@ -274,7 +358,7 @@ async function handleFiles(fileCollection) {
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
   if (currentMode === "gif" && selectedFiles[0]) generateThumbnails(selectedFiles[0]);
-  if (currentMode === "audio" && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
+  if ((currentMode === "audio" || currentMode === "karaoke") && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
 }
 
 let draggedIndex = null;
@@ -379,7 +463,15 @@ async function convertQueue() {
   clearError();
   resetResults();
   setProgress(0);
-  if (!selectedFiles.length) { showError(mode === "mp4" ? "Please select WebM or MP4 video files first." : "Please select video files first."); return; }
+  if (!selectedFiles.length) {
+    showError(mode === "mp4" ? "Please select WebM or MP4 video files first." : "Please select media files first.");
+    return;
+  }
+
+  if (mode === "karaoke" && !karaokeEngine.words.some((w) => w.start !== null)) {
+    showError("Please sync at least one word in the Lyrics Studio before exporting.");
+    return;
+  }
 
   const trim = getTrimSettings();
   if (trim.error) {
@@ -404,8 +496,8 @@ async function convertQueue() {
   try {
     cancelRequested = false;
     setBusy(true);
-    thumbnailAbortToken++; // C-03: signal thumbnail generation to abort
-    releaseFfmpegMemory(); // C-03: terminate any in-flight thumbnail ffmpeg worker for a clean slate
+    thumbnailAbortToken++;
+    releaseFfmpegMemory();
     await loadFfmpeg();
     for (activeFileIndex = 0; activeFileIndex < selectedFiles.length; activeFileIndex += 1) {
       const file = selectedFiles[activeFileIndex];
@@ -427,7 +519,7 @@ async function convertQueue() {
     const completed = results.filter((result) => !result.error).length;
     setProgress(100);
     setStatus(`${completed} of ${results.length} file${results.length === 1 ? "" : "s"} converted successfully.`);
-    if (completed < results.length) showError(`${results.length - completed} file${results.length - completed === 1 ? " could" : "s could"} not be converted. See the results below.`);
+    if (completed < results.length) showError(`${results.length - completed} file${results.length - completed === 1 ? " could" : "s could"} not be converted. See results below.`);
   } catch (error) {
     console.error(error);
     if (cancelRequested || String(error?.message).includes("cancelled")) {
@@ -449,7 +541,7 @@ function cancelConversion() {
   if (cancelRequested) return;
   cancelRequested = true;
   cancelButton.disabled = true;
-  setStatus("Cancelling the current conversion...");
+  setStatus("Cancelling current conversion...");
   releaseFfmpegMemory();
 }
 
@@ -462,6 +554,7 @@ function showPreview(file) {
   previewMeta.textContent = "Loading details...";
   previewPanel.classList.remove("is-hidden");
   if (getMode() !== "audio") saveFrameBar.classList.remove("is-hidden");
+  if (getMode() === "karaoke") dynamicSubtitleOverlay.classList.remove("is-hidden");
 }
 
 function resetPreview() {
@@ -473,7 +566,7 @@ function resetPreview() {
   previewPanel.classList.add("is-hidden");
   resetCrop();
   cropActions.classList.add("is-hidden");
-  revokeThumbnailUrls(); // C-01: free thumbnail blob URLs before clearing the array
+  revokeThumbnailUrls();
   thumbnailImages = [];
   timelineReady = false;
   timelineCanvas.classList.add("is-hidden");
@@ -483,6 +576,7 @@ function resetPreview() {
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
   saveFrameBar.classList.add("is-hidden");
+  if (dynamicSubtitleOverlay) dynamicSubtitleOverlay.classList.add("is-hidden");
 }
 
 function loadMediaMetadata(file) {
@@ -521,7 +615,8 @@ function detectCodec(file) {
   if (ext === "avi") return "MPEG-4";
   if (ext === "ogv" || ext === "ogg") return "Theora";
   if (ext === "3gp") return "H.264";
-  return "Video";
+  if (type.includes("audio") || ["mp3", "wav", "aac", "m4a", "flac"].includes(ext)) return "Audio";
+  return "Media";
 }
 
 function updatePreviewMetadata(file) {
@@ -529,7 +624,6 @@ function updatePreviewMetadata(file) {
   previewMeta.innerHTML = formatMediaMetadata(fileMetadata.get(file));
 }
 
-// C-04: escape any user-derived values inserted into HTML to prevent injection
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -562,10 +656,12 @@ async function convertFile(file, mode, index, trim) {
   const token = `${Date.now()}-${index}`;
   const inputName = `input-${token}.${getFileExtension(file.name) || "video"}`;
   const srtName = `subs-${token}.srt`;
+  const assName = `subs-${token}.ass`;
   const extAudioName = selectedExternalAudioFile ? `extaudio-${token}.${getFileExtension(selectedExternalAudioFile.name) || "mp3"}` : null;
   const outputName = getOutputName(file.name, mode);
   let wroteInput = false;
   let wroteSrt = false;
+  let wroteAss = false;
   let wroteExtAudio = false;
   let wroteOutput = false;
   try {
@@ -581,11 +677,38 @@ async function convertFile(file, mode, index, trim) {
       wroteExtAudio = true;
     }
 
-    const initialArgs = mode === "mp4"
-      ? getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null)
-      : mode === "gif"
-      ? getGifArgs(inputName, outputName, trim)
-      : getAudioArgs(inputName, outputName, trim);
+    if (mode === "karaoke") {
+      const style = getActiveKaraokeStyle();
+      const assData = exportAss(karaokeEngine.words, style);
+      await ffmpeg.writeFile(assName, new TextEncoder().encode(assData));
+      wroteAss = true;
+    }
+
+    let initialArgs;
+    if (mode === "karaoke") {
+      initialArgs = [
+        "-hide_banner", "-y",
+        ...getTrimInputArgs(trim),
+        "-i", inputName,
+        ...getTrimDurationArgs(trim),
+        "-vf", `subtitles=${assName}`,
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "22",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-f", "mp4",
+        outputName,
+      ];
+    } else if (mode === "mp4") {
+      initialArgs = getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null);
+    } else if (mode === "gif") {
+      initialArgs = getGifArgs(inputName, outputName, trim);
+    } else {
+      initialArgs = getAudioArgs(inputName, outputName, trim);
+    }
 
     let exitCode = await ffmpeg.exec(initialArgs);
     if (mode === "mp4" && exitCode !== 0) {
@@ -613,6 +736,7 @@ async function convertFile(file, mode, index, trim) {
     await cleanupFiles(
       ...(wroteInput ? [inputName] : []),
       ...(wroteSrt ? [srtName] : []),
+      ...(wroteAss ? [assName] : []),
       ...(wroteExtAudio && extAudioName ? [extAudioName] : []),
       ...(wroteOutput ? [outputName] : [])
     );
@@ -792,7 +916,6 @@ function getGifDurationError(trim) {
   const durations = selectedFiles.map((file) => fileMetadata.get(file)?.duration).filter(Number.isFinite);
   if (!durations.length) return "";
   const start = trim.start || 0;
-  // M-06: clamp individual durations to 0 so start > duration yields 0, not negative
   const requestedDuration = trim.end !== undefined
     ? trim.end - start
     : Math.max(...durations.map((duration) => Math.max(0, duration - start)));
@@ -852,6 +975,13 @@ function savePreferences() {
     loudness: loudnessNormalize?.checked ?? false,
     mp4Audio: mp4AudioTrack?.value ?? "stereo",
     mp4Filter: mp4ColorFilter?.value ?? "none",
+    karaokePreset: activePresetId,
+    karaokeFont: karaokeFontFamily?.value,
+    karaokeSize: karaokeFontSize?.value,
+    karaokeColor: karaokePrimaryColor?.value,
+    karaokeActiveColor: karaokeActiveColor?.value,
+    karaokePos: karaokePosition?.value,
+    karaokeUpper: karaokeUppercase?.checked ?? true,
   };
   try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
 }
@@ -873,6 +1003,13 @@ function restorePreferences() {
     if (loudnessNormalize && preferences.loudness !== undefined) loudnessNormalize.checked = !!preferences.loudness;
     if (mp4AudioTrack && preferences.mp4Audio) setSelectValue(mp4AudioTrack, preferences.mp4Audio);
     if (mp4ColorFilter && preferences.mp4Filter) setSelectValue(mp4ColorFilter, preferences.mp4Filter);
+    if (preferences.karaokePreset) applyKaraokePreset(preferences.karaokePreset);
+    if (karaokeFontFamily && preferences.karaokeFont) setSelectValue(karaokeFontFamily, preferences.karaokeFont);
+    if (karaokeFontSize && preferences.karaokeSize) setSelectValue(karaokeFontSize, preferences.karaokeSize);
+    if (karaokePrimaryColor && preferences.karaokeColor) karaokePrimaryColor.value = preferences.karaokeColor;
+    if (karaokeActiveColor && preferences.karaokeActiveColor) karaokeActiveColor.value = preferences.karaokeActiveColor;
+    if (karaokePosition && preferences.karaokePos) setSelectValue(karaokePosition, preferences.karaokePos);
+    if (karaokeUppercase && preferences.karaokeUpper !== undefined) karaokeUppercase.checked = preferences.karaokeUpper;
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
@@ -901,6 +1038,14 @@ function restoreAllDefaults() {
   if (externalAudioName) externalAudioName.textContent = "";
   trimStart.value = "";
   trimEnd.value = "";
+
+  // Reset Karaoke
+  karaokeEngine.resetSync();
+  karaokeEngine.setWords([]);
+  applyKaraokePreset("tiktok");
+  if (karaokeLyricsInput) karaokeLyricsInput.value = "";
+  renderWordChipsQueue();
+
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
   resetCrop();
   cropActions.classList.add("is-hidden");
@@ -929,25 +1074,34 @@ function updateModeUI({ resetFiles }) {
   const mode = getMode();
   const isMp4 = mode === "mp4";
   const isGif = mode === "gif";
+  const isKaraoke = mode === "karaoke";
+
   audioSettings.classList.toggle("is-hidden", mode !== "audio");
   mp4Settings.classList.toggle("is-hidden", !isMp4);
   mp4Note.classList.toggle("is-hidden", !isMp4);
   gifSettings.classList.toggle("is-hidden", !isGif);
   gifNote.classList.toggle("is-hidden", !isGif);
+
+  if (karaokeSettings) karaokeSettings.classList.toggle("is-hidden", !isKaraoke);
+  if (karaokeNote) karaokeNote.classList.toggle("is-hidden", !isKaraoke);
+  if (dynamicSubtitleOverlay) dynamicSubtitleOverlay.classList.toggle("is-hidden", !isKaraoke);
+
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
   dropHint.textContent = modeContent[mode].dropHint;
   initPreviewTools(mode);
+
   if (isGif && selectedFiles.length) {
     cropActions.classList.remove("is-hidden");
   } else {
     cropActions.classList.add("is-hidden");
     resetCrop();
   }
+
   if (resetFiles) clearSelection();
   setBusy(false);
   setStatus(modeContent[mode].empty);
-  // show/hide save-frame based on mode and current preview state
+
   if (!previewPanel.classList.contains("is-hidden") && mode !== "audio") {
     saveFrameBar.classList.remove("is-hidden");
   } else {
@@ -958,7 +1112,7 @@ function updateModeUI({ resetFiles }) {
 function setBusy(busy) {
   conversionInProgress = busy;
   convertButton.disabled = busy;
-  form.querySelectorAll("input, select").forEach((control) => { control.disabled = busy; });
+  form.querySelectorAll("input, select, textarea").forEach((control) => { control.disabled = busy; });
   clearFilesButton.disabled = busy;
   fileList.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
   dropZone.classList.toggle("is-disabled", busy);
@@ -980,35 +1134,59 @@ function getFriendlyError(error, mode) {
   if (message.includes("memory")) return "The browser ran out of memory. Try fewer or smaller files.";
   if (message.includes("empty-output")) return "No output file was generated.";
   if (mode === "gif") return `This video could not be converted to ${getGifOutputExtension().toUpperCase()}. Try a shorter clip or smaller size.`;
-  if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "No compatible audio track was found.";
-  return mode === "mp4" ? "This video could not be converted or optimized as MP4." : "This video could not be converted.";
+  if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) {
+    return mode === "mp4" || mode === "karaoke" ? "This video could not be converted or subtitled." : "No compatible audio track was found.";
+  }
+  return mode === "mp4" || mode === "karaoke" ? "This video could not be converted." : "This media file could not be converted.";
 }
 
-function getValidationMessage(mode) { return mode === "mp4" ? "Please select one or more .webm or .mp4 video files." : "The selected files do not appear to be compatible videos."; }
-// M-01: use optional chaining so a missing :checked radio returns "" instead of throwing TypeError
+function getValidationMessage(mode) {
+  if (mode === "mp4") return "Please select one or more .webm or .mp4 video files.";
+  if (mode === "karaoke") return "Please select a video or audio file for Karaoke/Subtitles.";
+  return "The selected files do not appear to be compatible media files.";
+}
+
 function getCheckedValue(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value ?? ""; }
 function getMode() { return getCheckedValue("mode"); }
-function isValidFileForMode(file, mode) { return mode === "mp4" ? isMp4SourceFile(file) : isVideoFile(file); }
-// M-07: centralised extension/type lists — add a new format in one place only
+function isValidFileForMode(file, mode) {
+  if (mode === "mp4") return isMp4SourceFile(file);
+  if (mode === "karaoke") return isVideoFile(file) || isAudioFile(file);
+  return isVideoFile(file);
+}
+
 const VIDEO_EXTENSIONS = ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"];
+const AUDIO_EXTENSIONS = ["mp3", "wav", "aac", "m4a", "ogg", "flac", "wma"];
 const MP4_SOURCE_EXTENSIONS = ["webm", "mp4"];
 const MP4_SOURCE_TYPES = ["video/webm", "video/mp4"];
+
 function isVideoFile(file) { return file.type.startsWith("video/") || VIDEO_EXTENSIONS.includes(getFileExtension(file.name)); }
+function isAudioFile(file) { return file.type.startsWith("audio/") || AUDIO_EXTENSIONS.includes(getFileExtension(file.name)); }
 function isMp4SourceFile(file) { return MP4_SOURCE_TYPES.includes(file.type) || MP4_SOURCE_EXTENSIONS.includes(getFileExtension(file.name)); }
+
 function getOutputName(name, mode) {
   if (mode === "gif") {
     const ext = getGifOutputExtension();
     return `${safeBaseName(name)}-clip.${ext}`;
   }
+  if (mode === "karaoke") {
+    return `${safeBaseName(name)}-subtitled.mp4`;
+  }
   const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : "";
   return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`;
 }
-function getOutputExtension(mode) { return mode === "mp4" ? "mp4" : mode === "gif" ? getGifOutputExtension() : getCheckedValue("format"); }
+
+function getOutputExtension(mode) {
+  if (mode === "mp4" || mode === "karaoke") return "mp4";
+  if (mode === "gif") return getGifOutputExtension();
+  return getCheckedValue("format");
+}
+
 function getSizeComparison(input, output) {
   const difference = input ? Math.round((1 - output / input) * 100) : 0;
   const change = difference >= 0 ? `${difference}% smaller` : `${Math.abs(difference)}% larger`;
   return `${formatBytes(input)} → ${formatBytes(output)} · ${change}`;
 }
+
 function localAssetURL(path) { return new URL(path, window.location.href).href; }
 function setProgress(percent) { progressBar.style.width = `${percent}%`; }
 function setStatus(message) { statusMessage.textContent = message; }
@@ -1149,40 +1327,41 @@ document.addEventListener("mousemove", (event) => {
     const dy = event.clientY - cropStartY;
     const vr = getVideoRect();
     if (cropDragging) {
-      cropRect.x = clamp(cropStartRect.x + dx, vr.x, vr.x + vr.w - cropRect.w);
-      cropRect.y = clamp(cropStartRect.y + dy, vr.y, vr.y + vr.h - cropRect.h);
+      const maxX = vr.x + vr.w - cropStartRect.w;
+      const maxY = vr.y + vr.h - cropStartRect.h;
+      cropRect.x = clamp(cropStartRect.x + dx, vr.x, maxX);
+      cropRect.y = clamp(cropStartRect.y + dy, vr.y, maxY);
     } else if (cropResizing) {
       applyResize(cropResizeHandle, dx, dy, vr);
     }
     renderCropBox();
-    return;
   }
-  if (!trimOverlayDragging && !trimOverlayResizing) return;
-  const dx = event.clientX - trimOverlayDragStartX;
-  const w = timelineCanvas.clientWidth;
-  const duration = videoPreview.duration;
-  const startRange = trimOverlayDragStartRange;
-  const maxDur = getMaxTrimDuration();
-  const minDur = 1;
-  const dxSeconds = (dx / w) * duration;
 
-  if (trimOverlayDragging) {
-    let newStart = startRange.startSec + dxSeconds;
-    let newEnd = startRange.endSec + dxSeconds;
-    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
-    if (newEnd > duration) { newStart -= (newEnd - duration); newEnd = duration; }
-    newStart = Math.max(0, newStart);
-    newEnd = Math.min(duration, newEnd);
-    applyTrimRange(newStart, newEnd);
-  } else if (trimOverlayResizing) {
-    if (trimOverlayHandle === "left") {
-      let newStart = clamp(startRange.startSec + dxSeconds, 0, startRange.endSec - minDur);
-      if (startRange.endSec - newStart > maxDur) newStart = startRange.endSec - maxDur;
-      applyTrimRange(newStart, startRange.endSec);
-    } else {
-      let newEnd = clamp(startRange.endSec + dxSeconds, startRange.startSec + minDur, duration);
-      if (newEnd - startRange.startSec > maxDur) newEnd = startRange.startSec + maxDur;
-      applyTrimRange(startRange.startSec, newEnd);
+  if (trimOverlayDragging || trimOverlayResizing) {
+    if (!videoPreview.duration || !trimOverlayDragStartRange) return;
+    const rect = timelineCanvas.getBoundingClientRect();
+    const deltaX = event.clientX - trimOverlayDragStartX;
+    const deltaSec = (deltaX / rect.width) * videoPreview.duration;
+    const duration = videoPreview.duration;
+    const maxDur = getMaxTrimDuration();
+
+    if (trimOverlayDragging) {
+      const windowDur = trimOverlayDragStartRange.endSec - trimOverlayDragStartRange.startSec;
+      let newStart = clamp(trimOverlayDragStartRange.startSec + deltaSec, 0, duration - windowDur);
+      let newEnd = newStart + windowDur;
+      applyTrimRange(newStart, newEnd);
+    } else if (trimOverlayHandle === "left") {
+      let newStart = clamp(trimOverlayDragStartRange.startSec + deltaSec, 0, trimOverlayDragStartRange.endSec - 1);
+      if (trimOverlayDragStartRange.endSec - newStart > maxDur) {
+        newStart = trimOverlayDragStartRange.endSec - maxDur;
+      }
+      applyTrimRange(newStart, trimOverlayDragStartRange.endSec);
+    } else if (trimOverlayHandle === "right") {
+      let newEnd = clamp(trimOverlayDragStartRange.endSec + deltaSec, trimOverlayDragStartRange.startSec + 1, duration);
+      if (newEnd - trimOverlayDragStartRange.startSec > maxDur) {
+        newEnd = trimOverlayDragStartRange.startSec + maxDur;
+      }
+      applyTrimRange(trimOverlayDragStartRange.startSec, newEnd);
     }
   }
 });
@@ -1192,7 +1371,6 @@ document.addEventListener("mouseup", () => {
     cropDragging = false;
     cropResizing = false;
     cropResizeHandle = null;
-    cropStartRect = null;
     videoPreview.controls = true;
   }
   if (trimOverlayDragging || trimOverlayResizing) {
@@ -1272,7 +1450,6 @@ function handleTimelineHoverEnd() {
   }
 }
 
-// C-01: revoke all blob URLs held by the thumbnail image array
 function revokeThumbnailUrls() {
   thumbnailImages.forEach((img) => {
     if (img?.src?.startsWith("blob:")) URL.revokeObjectURL(img.src);
@@ -1281,10 +1458,10 @@ function revokeThumbnailUrls() {
 
 async function generateThumbnails(file) {
   if (!file || timelineReady) return;
-  revokeThumbnailUrls(); // C-01: free blob URLs from any previous thumbnail run
+  revokeThumbnailUrls();
   thumbnailImages = [];
   timelineReady = false;
-  const myToken = ++thumbnailAbortToken; // C-03: stamp this generation run
+  const myToken = ++thumbnailAbortToken;
   timelineCanvas.classList.remove("is-hidden");
   const dpr = window.devicePixelRatio || 1;
   timelineCanvas.width = timelineCanvas.clientWidth * dpr;
@@ -1304,7 +1481,7 @@ async function generateThumbnails(file) {
   let wroteInput = false;
   try {
     await loadFfmpeg();
-    if (thumbnailAbortToken !== myToken) return; // C-03: bail if conversion already started
+    if (thumbnailAbortToken !== myToken) return;
     await ffmpeg.writeFile(inputName, await fetchFile(file));
     wroteInput = true;
     if (thumbnailAbortToken !== myToken) return;
@@ -1318,11 +1495,11 @@ async function generateThumbnails(file) {
         ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName])
           .then(() => ffmpeg.readFile(outName))
           .then((data) => {
-            if (thumbnailAbortToken !== myToken) return; // C-03: discard result if cancelled
+            if (thumbnailAbortToken !== myToken) return;
             const blob = new Blob([data], { type: "image/jpeg" });
             const blobUrl = URL.createObjectURL(blob);
             const img = new Image();
-            img.onload = () => URL.revokeObjectURL(blobUrl); // C-01: release URL right after decode
+            img.onload = () => URL.revokeObjectURL(blobUrl);
             img.src = blobUrl;
             thumbnailImages[i - 1] = img;
           })
@@ -1338,7 +1515,6 @@ async function generateThumbnails(file) {
   } catch {
     timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
   } finally {
-    // M-03: always purge MEMFS entries — even when Promise.all or loadFfmpeg throws
     const cleanupTasks = Array.from({ length: TIMELINE_THUMBNAILS }, (_, i) =>
       ffmpeg.deleteFile(`thumb-${i + 1}.jpg`).catch(() => {})
     );
@@ -1351,7 +1527,6 @@ function drawTimeline() {
   const dpr = window.devicePixelRatio || 1;
   const w = timelineCanvas.clientWidth;
   const h = timelineCanvas.clientHeight;
-  // M-05: re-sync canvas pixel dimensions when DPR or element size changes (e.g. window resize)
   const expectedW = Math.round(w * dpr);
   const expectedH = Math.round(h * dpr);
   if (timelineCanvas.width !== expectedW || timelineCanvas.height !== expectedH) {
@@ -1409,13 +1584,12 @@ function drawWaveform() {
 }
 
 async function decodeAudio(file) {
-  // C-02: abort any pending decode and ensure only one AudioContext exists at a time
   if (decodeAbortController) decodeAbortController.abort();
   decodeAbortController = new AbortController();
   const { signal } = decodeAbortController;
 
   if (audioContext) {
-    try { await audioContext.close(); } catch { /* already closed or suspended */ }
+    try { await audioContext.close(); } catch { /* already closed */ }
     audioContext = null;
   }
 
@@ -1437,9 +1611,7 @@ async function decodeAudio(file) {
   }
 }
 
-function getGifOutputExtension() {
-  return getCheckedValue("gif-output") || "gif";
-}
+function getGifOutputExtension() { return getCheckedValue("gif-output") || "gif"; }
 
 function refreshAccentColor() {
   cachedAccentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-strong").trim() || "#91bd59";
@@ -1565,8 +1737,8 @@ function handleTrimInputChange() {
   const startSec = parsed.start || 0;
   const endSec = parsed.end || duration;
   if (endSec <= startSec) return;
-  const clamped = clampTrimRange(startSec, endSec); // M-02: capture and apply the clamped values
-  syncTrimInputs(clamped.startSec, clamped.endSec); // M-02: keep text inputs in sync with clamped range
+  const clamped = clampTrimRange(startSec, endSec);
+  syncTrimInputs(clamped.startSec, clamped.endSec);
   drawTimeline();
 }
 
@@ -1587,10 +1759,7 @@ function initPreviewTools(mode) {
   }
 }
 
-// =====================================================================
-// Sprint 1 & 2 — Event listeners
-// =====================================================================
-
+// Event listeners
 savePresetButton.addEventListener("click", toggleSavePresetInput);
 presetConfirm.addEventListener("click", confirmSavePreset);
 presetCancel.addEventListener("click", hideSavePresetInput);
@@ -1601,7 +1770,6 @@ presetNameInput.addEventListener("keydown", (e) => {
 saveFrameButton.addEventListener("click", saveCurrentFrame);
 if (shareConfigButton) shareConfigButton.addEventListener("click", handleShareConfig);
 
-// Sprint 3 event listeners
 if (subtitlesInput) {
   subtitlesInput.addEventListener("change", (e) => {
     const file = e.target.files?.[0];
@@ -1647,10 +1815,7 @@ if (historyClose) historyClose.addEventListener("click", closeHistoryModal);
 if (historyBackdrop) historyBackdrop.addEventListener("click", closeHistoryModal);
 if (historyClear) historyClear.addEventListener("click", clearHistory);
 
-// =====================================================================
-// Sprint 3 — Conversion History & Savings
-// =====================================================================
-
+// Conversion History
 const HISTORY_KEY = "beetales-converter-history-v1";
 
 function loadHistoryFromStorage() {
@@ -1751,10 +1916,7 @@ function clearHistory() {
   setStatus("Conversion history cleared.");
 }
 
-// =====================================================================
-// Sprint 1 & 2 — Saved presets
-// =====================================================================
-
+// Saved presets
 const PRESETS_KEY = "beetales-converter-presets-v1";
 
 function loadPresetsFromStorage() {
@@ -1832,6 +1994,13 @@ function confirmSavePreset() {
     loudness:    loudnessNormalize?.checked ?? false,
     mp4Audio:    mp4AudioTrack?.value ?? "stereo",
     mp4Filter:   mp4ColorFilter?.value ?? "none",
+    karaokePreset: activePresetId,
+    karaokeFont: karaokeFontFamily?.value,
+    karaokeSize: karaokeFontSize?.value,
+    karaokeColor: karaokePrimaryColor?.value,
+    karaokeActiveColor: karaokeActiveColor?.value,
+    karaokePos: karaokePosition?.value,
+    karaokeUpper: karaokeUppercase?.checked ?? true,
   };
   const all = loadPresetsFromStorage();
   const existing = all.findIndex((p) => p.name === name);
@@ -1856,15 +2025,20 @@ function applyPreset(preset) {
   if (loudnessNormalize) loudnessNormalize.checked = !!preset.loudness;
   if (mp4AudioTrack && preset.mp4Audio)       setSelectValue(mp4AudioTrack, preset.mp4Audio);
   if (mp4ColorFilter && preset.mp4Filter)     setSelectValue(mp4ColorFilter, preset.mp4Filter);
+  if (preset.karaokePreset) applyKaraokePreset(preset.karaokePreset);
+  if (karaokeFontFamily && preset.karaokeFont) setSelectValue(karaokeFontFamily, preset.karaokeFont);
+  if (karaokeFontSize && preset.karaokeSize) setSelectValue(karaokeFontSize, preset.karaokeSize);
+  if (karaokePrimaryColor && preset.karaokeColor) karaokePrimaryColor.value = preset.karaokeColor;
+  if (karaokeActiveColor && preset.karaokeActiveColor) karaokeActiveColor.value = preset.karaokeActiveColor;
+  if (karaokePosition && preset.karaokePos) setSelectValue(karaokePosition, preset.karaokePos);
+  if (karaokeUppercase && preset.karaokeUpper !== undefined) karaokeUppercase.checked = preset.karaokeUpper;
+
   updateModeUI({ resetFiles: false });
   savePreferences();
   setStatus(`Preset "${preset.name}" applied.`);
 }
 
-// =====================================================================
-// Sprint 2 — Share URL generation & parsing
-// =====================================================================
-
+// Share URL generation & parsing
 function generateShareUrl() {
   const params = new URLSearchParams();
   const mode = getMode();
@@ -1884,6 +2058,8 @@ function generateShareUrl() {
     params.set("width", gifWidth.value);
     params.set("fps", gifFps.value);
     if (gifSpeed?.value && gifSpeed.value !== "1") params.set("speed", gifSpeed.value);
+  } else if (mode === "karaoke") {
+    params.set("k_preset", activePresetId);
   }
   const url = new URL(window.location.href);
   url.search = params.toString();
@@ -1922,7 +2098,7 @@ function applyUrlParams() {
   try {
     const params = new URLSearchParams(search);
     const mode = params.get("mode");
-    if (mode && ["audio", "mp4", "gif"].includes(mode)) {
+    if (mode && ["audio", "mp4", "gif", "karaoke"].includes(mode)) {
       setCheckedValue("mode", mode);
     }
     if (params.has("format")) setCheckedValue("format", params.get("format"));
@@ -1939,6 +2115,7 @@ function applyUrlParams() {
     if (params.has("gif_out")) setCheckedValue("gif-output", params.get("gif_out"));
     if (params.has("width")) setSelectValue(gifWidth, params.get("width"));
     if (params.has("fps")) setSelectValue(gifFps, params.get("fps"));
+    if (params.has("k_preset")) applyKaraokePreset(params.get("k_preset"));
 
     savePreferences();
     setStatus("Configuration loaded from URL link.");
@@ -1947,10 +2124,7 @@ function applyUrlParams() {
   }
 }
 
-// =====================================================================
-// Sprint 1 — Save current video frame as JPEG
-// =====================================================================
-
+// Frame snapshot
 function saveCurrentFrame() {
   if (!videoPreview.videoWidth || !videoPreview.videoHeight) return;
   const canvas = document.createElement("canvas");
@@ -1969,15 +2143,6 @@ function saveCurrentFrame() {
   }, "image/jpeg", 0.92);
 }
 
-// =====================================================================
-// Sprint 1 — Speed helpers
-// =====================================================================
-
-/**
- * Builds a valid atempo filter chain for any speed value.
- * ffmpeg atempo only accepts 0.5–2.0; chain multiple filters for outside values.
- * Examples: 0.25× → "atempo=0.5,atempo=0.5"   2× → "atempo=2.0"
- */
 function getAtempoChain(speed) {
   const filters = [];
   let s = speed;
@@ -1988,7 +2153,338 @@ function getAtempoChain(speed) {
 }
 
 // =====================================================================
-// Sprint 4 — i18n & User Guide Modal
+// Sprint 5 — Karaoke & Dynamic Subtitles Logic
+// =====================================================================
+
+function initKaraokeStudio() {
+  if (!karaokeSettings) return;
+
+  // Tabs switching
+  if (karaokeTabPaste && karaokeTabImport) {
+    karaokeTabPaste.addEventListener("click", () => {
+      karaokeTabPaste.classList.add("is-active");
+      karaokeTabImport.classList.remove("is-active");
+      karaokePanelPaste.classList.remove("is-hidden");
+      karaokePanelImport.classList.add("is-hidden");
+    });
+    karaokeTabImport.addEventListener("click", () => {
+      karaokeTabImport.classList.add("is-active");
+      karaokeTabPaste.classList.remove("is-active");
+      karaokePanelImport.classList.remove("is-hidden");
+      karaokePanelPaste.classList.add("is-hidden");
+    });
+  }
+
+  // Parse lyrics button
+  if (karaokePrepareBtn) {
+    karaokePrepareBtn.addEventListener("click", () => {
+      const text = (karaokeLyricsInput?.value || "").trim();
+      if (!text) {
+        showError("Please paste some lyrics or script in the text box.");
+        karaokeLyricsInput?.focus();
+        return;
+      }
+      clearError();
+      const words = splitLyricsIntoWords(text, {
+        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
+        preserveLineBreaks: true,
+      });
+      karaokeEngine.setWords(words);
+      renderWordChipsQueue();
+      setStatus(`Prepared ${words.length} words for synchronization. Play the video and tap Space!`);
+    });
+  }
+
+  // Subtitle File Import
+  if (karaokeFileInput) {
+    karaokeFileInput.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const ext = getFileExtension(file.name);
+        let words = [];
+        if (ext === "lrc") {
+          words = parseLrc(text);
+        } else if (ext === "srt" || ext === "vtt") {
+          words = parseSrt(text);
+        } else if (ext === "json") {
+          words = JSON.parse(text);
+        } else {
+          words = parseSrt(text);
+        }
+
+        if (!words.length) {
+          showError("Could not find timestamped words in the imported file.");
+          return;
+        }
+
+        karaokeEngine.setWords(words);
+        renderWordChipsQueue();
+        setStatus(`Imported ${words.length} synced words from "${file.name}".`);
+      } catch (err) {
+        showError(`Error reading subtitle file: ${err.message}`);
+      }
+    });
+  }
+
+  // Tap-to-Sync Controls
+  if (karaokeTapBtn) {
+    karaokeTapBtn.addEventListener("click", () => {
+      handleSyncTap();
+    });
+  }
+
+  if (karaokeUndoBtn) {
+    karaokeUndoBtn.addEventListener("click", () => {
+      if (karaokeEngine.undoTap()) {
+        renderWordChipsQueue();
+        updateSubtitleOverlay();
+      }
+    });
+  }
+
+  if (karaokeResetBtn) {
+    karaokeResetBtn.addEventListener("click", () => {
+      karaokeEngine.resetSync();
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+      setStatus("Sync timestamps reset.");
+    });
+  }
+
+  // Spacebar hotkey listener for tap-to-sync
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && getMode() === "karaoke") {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+      if (activeTag === "textarea" || activeTag === "input") return; // Don't intercept while typing text
+      if (karaokeEngine.words.length > 0) {
+        e.preventDefault();
+        handleSyncTap();
+      }
+    }
+  });
+
+  // Presets selector
+  karaokePresetCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      const presetId = card.dataset.preset;
+      applyKaraokePreset(presetId);
+    });
+  });
+
+  // Custom Controls Listeners
+  [karaokeFontFamily, karaokeFontSize, karaokePrimaryColor, karaokeActiveColor, karaokePosition, karaokeUppercase].forEach((control) => {
+    if (control) {
+      control.addEventListener("input", () => {
+        karaokeEngine.setStyle(getActiveKaraokeStyle());
+        updateSubtitleOverlay();
+        savePreferences();
+      });
+    }
+  });
+
+  // Download buttons
+  if (karaokeDlLrc) {
+    karaokeDlLrc.addEventListener("click", () => {
+      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
+      const lrcContent = exportLrc(karaokeEngine.words, { title: selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "Track" });
+      const blob = new Blob([lrcContent], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "karaoke"}.lrc`);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
+  }
+
+  if (karaokeDlSrt) {
+    karaokeDlSrt.addEventListener("click", () => {
+      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
+      const srtContent = exportSrt(karaokeEngine.words, { uppercase: karaokeUppercase?.checked });
+      const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "subtitles"}.srt`);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
+  }
+
+  if (karaokeDlAss) {
+    karaokeDlAss.addEventListener("click", () => {
+      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
+      const assContent = exportAss(karaokeEngine.words, getActiveKaraokeStyle());
+      const blob = new Blob([assContent], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "styled-subtitles"}.ass`);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
+  }
+}
+
+function handleSyncTap() {
+  if (!karaokeEngine.words.length) return;
+  const currentTime = videoPreview.currentTime || 0;
+  const syncedWord = karaokeEngine.recordTap(currentTime);
+  if (syncedWord) {
+    renderWordChipsQueue();
+    updateSubtitleOverlay();
+  } else {
+    setStatus("All words in the queue have been synchronized! You can now burn or export.");
+  }
+}
+
+function getActiveKaraokeStyle() {
+  const basePreset = SUBTITLE_PRESETS[activePresetId] || SUBTITLE_PRESETS.tiktok;
+  return {
+    ...basePreset,
+    fontFamily: karaokeFontFamily?.value || basePreset.fontFamily,
+    fontSize: parseInt(karaokeFontSize?.value, 10) || basePreset.fontSize,
+    primaryColor: karaokePrimaryColor?.value || basePreset.primaryColor,
+    activeColor: karaokeActiveColor?.value || basePreset.activeColor,
+    position: karaokePosition?.value || basePreset.position,
+    uppercase: karaokeUppercase?.checked ?? basePreset.uppercase,
+  };
+}
+
+function applyKaraokePreset(presetId) {
+  const preset = SUBTITLE_PRESETS[presetId];
+  if (!preset) return;
+  activePresetId = presetId;
+  karaokePresetCards.forEach((c) => c.classList.toggle("is-active", c.dataset.preset === presetId));
+
+  if (karaokeFontFamily) setSelectValue(karaokeFontFamily, preset.fontFamily);
+  if (karaokeFontSize) setSelectValue(karaokeFontSize, String(preset.fontSize));
+  if (karaokePrimaryColor) karaokePrimaryColor.value = preset.primaryColor;
+  if (karaokeActiveColor) karaokeActiveColor.value = preset.activeColor;
+  if (karaokePosition) setSelectValue(karaokePosition, preset.position);
+  if (karaokeUppercase) karaokeUppercase.checked = !!preset.uppercase;
+
+  karaokeEngine.setStyle(getActiveKaraokeStyle());
+  updateSubtitleOverlay();
+  savePreferences();
+}
+
+function renderWordChipsQueue() {
+  if (!karaokeWordsQueue) return;
+  karaokeWordsQueue.replaceChildren();
+
+  const words = karaokeEngine.words;
+  if (!words.length) {
+    const hint = document.createElement("p");
+    hint.className = "karaoke-empty-hint";
+    hint.textContent = "Paste lyrics above and click 'Prepare Words for Sync' to start synchronizing.";
+    karaokeWordsQueue.appendChild(hint);
+    if (karaokeTapBtn) karaokeTapBtn.disabled = true;
+    if (karaokeUndoBtn) karaokeUndoBtn.disabled = true;
+    if (karaokeResetBtn) karaokeResetBtn.disabled = true;
+    if (karaokeSyncCounter) karaokeSyncCounter.textContent = "0 / 0";
+    return;
+  }
+
+  if (karaokeTapBtn) karaokeTapBtn.disabled = false;
+  if (karaokeUndoBtn) karaokeUndoBtn.disabled = karaokeEngine.currentIndex === 0;
+  if (karaokeResetBtn) karaokeResetBtn.disabled = false;
+
+  const syncedCount = words.filter((w) => w.start !== null).length;
+  if (karaokeSyncCounter) {
+    karaokeSyncCounter.textContent = `${syncedCount} / ${words.length}`;
+  }
+
+  let activeChipEl = null;
+
+  words.forEach((w, idx) => {
+    const chip = document.createElement("span");
+    chip.className = "word-chip";
+    if (idx === karaokeEngine.currentIndex) {
+      chip.classList.add("is-active");
+      activeChipEl = chip;
+    } else if (w.start !== null) {
+      chip.classList.add("is-synced");
+    } else {
+      chip.classList.add("is-pending");
+    }
+
+    chip.textContent = w.text;
+
+    if (w.start !== null) {
+      const timeSpan = document.createElement("span");
+      timeSpan.className = "chip-time";
+      timeSpan.textContent = formatDuration(w.start);
+      chip.appendChild(timeSpan);
+    }
+
+    // Click word chip to seek video and set as active word
+    chip.addEventListener("click", () => {
+      karaokeEngine.currentIndex = idx;
+      if (w.start !== null) {
+        videoPreview.currentTime = w.start;
+      }
+      renderWordChipsQueue();
+      updateSubtitleOverlay();
+    });
+
+    karaokeWordsQueue.appendChild(chip);
+  });
+
+  if (activeChipEl) {
+    activeChipEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
+}
+
+function updateSubtitleOverlay() {
+  if (!dynamicSubtitleOverlay || !dynamicSubtitleBox) return;
+  if (getMode() !== "karaoke" || !karaokeEngine.words.length) {
+    dynamicSubtitleBox.replaceChildren();
+    return;
+  }
+
+  const currentTime = videoPreview.currentTime || 0;
+  const state = karaokeEngine.getActiveRenderState(currentTime);
+  const style = getActiveKaraokeStyle();
+
+  // Position class on overlay
+  dynamicSubtitleOverlay.className = `dynamic-subtitle-overlay pos-${style.position}`;
+
+  if (!state || !state.blockWords || !state.blockWords.length) {
+    dynamicSubtitleBox.replaceChildren();
+    return;
+  }
+
+  dynamicSubtitleBox.replaceChildren();
+
+  state.blockWords.forEach((w) => {
+    const wordSpan = document.createElement("span");
+    wordSpan.className = "sub-word";
+    wordSpan.textContent = style.uppercase ? w.text.toUpperCase() : w.text;
+
+    // Apply inline style properties
+    wordSpan.style.fontFamily = style.fontFamily;
+    wordSpan.style.fontSize = `${style.fontSize}px`;
+    wordSpan.style.webkitTextStroke = `${style.strokeWidth}px ${style.strokeColor}`;
+    wordSpan.style.textShadow = style.glow
+      ? `0 0 16px ${style.activeColor}, 0 4px 8px rgba(0,0,0,0.8)`
+      : `0 ${style.shadowDistance}px 10px ${style.shadowColor}`;
+
+    const isCurrentActive = state.activeWord && state.activeWord.id === w.id;
+    const isPassed = w.end !== null && currentTime > w.end;
+
+    if (isCurrentActive) {
+      wordSpan.classList.add("active");
+      wordSpan.style.color = style.activeColor;
+    } else if (isPassed) {
+      wordSpan.classList.add("passed");
+      wordSpan.style.color = style.activeColor;
+      wordSpan.style.opacity = "0.9";
+    } else {
+      wordSpan.classList.add("upcoming");
+      wordSpan.style.color = style.primaryColor;
+      wordSpan.style.opacity = "0.75";
+    }
+
+    dynamicSubtitleBox.appendChild(wordSpan);
+  });
+}
+
+// =====================================================================
+// i18n & User Guide Modal
 // =====================================================================
 
 function setLanguage(lang) {
@@ -2007,6 +2503,7 @@ function setLanguage(lang) {
   });
 
   if (presetNameInput) presetNameInput.placeholder = dict.preset_name_placeholder || "Preset name…";
+  if (karaokeLyricsInput) karaokeLyricsInput.placeholder = dict.karaoke_lyrics_placeholder || "Paste your lyrics or script here...";
 
   updateLocalizedModeContent();
   updateModeUI({ resetFiles: false });
@@ -2039,6 +2536,14 @@ function updateLocalizedModeContent() {
     modeContent.gif.dropHint = dict.drop_hint_gif || "Choose a short clip with Trim for the best result";
     modeContent.gif.busy = dict.busy_gif || "Creating GIF...";
     modeContent.gif.ready = dict.ready_gif || "video(s) ready for GIF creation.";
+  }
+  if (modeContent.karaoke) {
+    modeContent.karaoke.button = dict.btn_convert_karaoke || "Burn & Export MP4";
+    modeContent.karaoke.empty = dict.status_ready || "Select video or audio to start Karaoke & Subtitles.";
+    modeContent.karaoke.dropTitle = dict.drop_title_karaoke || "Select video or audio for Karaoke / Subtitles";
+    modeContent.karaoke.dropHint = dict.drop_hint_karaoke || "Upload your video or song, then paste lyrics below to sync";
+    modeContent.karaoke.busy = dict.busy_karaoke || "Generating subtitled video...";
+    modeContent.karaoke.ready = dict.ready_karaoke || "video(s) ready for subtitle creation & burning.";
   }
 }
 

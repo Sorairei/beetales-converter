@@ -30,7 +30,7 @@
 
 ## Overview
 
-**BeeTales Media Converter** is an open-source, local-first media powerhouse designed to extract high-bitrate audio, convert and optimize MP4 video, burn subtitles, normalize loudness, grade colors, and generate animated GIF/WebP clips—all executed inside your browser without uploading a single byte to external servers.
+**BeeTales Media Converter** is an open-source, local-first media powerhouse designed to extract high-bitrate audio, convert and optimize MP4 video, create animated Karaoke & TikTok-style dynamic captions, burn subtitles, normalize loudness, grade colors, and generate animated GIF/WebP clips—all executed inside your browser without uploading a single byte to external servers.
 
 Powered by a compiled WebAssembly (FFmpeg) engine, it provides studio-grade conversion tools directly on your device with zero backend dependencies, zero subscriptions, zero cookies, and complete offline capability once loaded.
 
@@ -40,14 +40,14 @@ Powered by a compiled WebAssembly (FFmpeg) engine, it provides studio-grade conv
 
 - [Key Features](#key-features)
 - [Conversion Modes & Capabilities](#conversion-modes--capabilities)
+- [Karaoke & Dynamic Subtitles Studio](#karaoke--dynamic-subtitles-studio)
 - [Advanced Video & Audio Tools](#advanced-video--audio-tools)
 - [Multi-Language & User Guide](#multi-language--user-guide)
 - [History & Space Savings Calculator](#history--space-savings-calculator)
 - [Presets & Shareable Links](#presets--shareable-links)
 - [How It Works](#how-it-works)
 - [Privacy & Security Guarantees](#privacy--security-guarantees)
-- [Architecture](#architecture)
-- [Repository Structure](#repository-structure)
+- [Architecture & Repository Structure](#architecture--repository-structure)
 - [Local Development & Deployment](#local-development--deployment)
 - [Quality & Automated Tests](#quality--automated-tests)
 - [Contributing & Sponsorship](#contributing--sponsorship)
@@ -61,6 +61,7 @@ Powered by a compiled WebAssembly (FFmpeg) engine, it provides studio-grade conv
 | --- | --- |
 | **100% Local Processing** | Files never leave your computer. All processing executes in browser memory via WebAssembly. |
 | **Multi-Language (i18n)** | Full dynamic localization in **English (EN)**, **Español (ES)**, **Português (PT)**, and **Polski (PL)**. |
+| **Karaoke & Subtitles Studio** | Real-time tap-to-sync (`Spacebar`), word highlighting, 60fps dynamic video overlay, and `.ass` subtitle burn-in. |
 | **Interactive User Manual** | Built-in modal documentation guide explaining all features, loudness standards, and conversion modes. |
 | **Audio Extraction** | High-fidelity MP3, WAV, and AAC export at 128k, 192k, or 320k bitrates with real-time waveform inspection. |
 | **Loudness Normalization** | Industry-standard **EBU R128** normalization (Spotify, YouTube, Netflix standard) for balanced audio levels. |
@@ -81,10 +82,11 @@ Powered by a compiled WebAssembly (FFmpeg) engine, it provides studio-grade conv
 
 ```mermaid
 graph TD
-    A[Input Video Files] --> B{Choose Conversion Mode}
+    A[Input Media Files] --> B{Choose Conversion Mode}
     B -->|Audio Mode| C[Extract Audio: MP3 / WAV / AAC + EBU R128]
     B -->|MP4 Mode| D[MP4 Transcoder: CRF Quality + Scaling + Speed + Filters + Subs]
     B -->|GIF Mode| E[Video to GIF / WebP: Palette Optimization + Area Crop]
+    B -->|Karaoke Mode| F[Karaoke Studio: Tap-to-Sync + Word Overlay + ASS Burn-in]
 ```
 
 ### 1. Extract Audio
@@ -104,6 +106,23 @@ graph TD
 - **Output Formats**: Standard animated `.gif` or lightweight animated `.webp`.
 - **Memory Safeguards**: GIF clips are bounded to 15 seconds to safeguard browser memory.
 
+### 4. Karaoke & Dynamic Subtitles
+- **Tap-to-Sync Engine**: Sync lyrics word-by-word with the Spacebar hotkey in real time.
+- **Visual Presets**: TikTok Pop (yellow bounce), Karaoke Glow (neon wipe), Shorts Creator, and Cinematic Clean.
+- **Client-Side Burn-in**: Advanced SubStation Alpha (`.ass`) compilation directly burned into MP4 with FFmpeg.wasm.
+- **Subtitle Export**: One-click download of `.lrc`, `.srt`, and `.ass` files.
+
+---
+
+## Karaoke & Dynamic Subtitles Studio
+
+Create viral TikTok/Shorts captions or customized sing-along karaoke videos without paying for third-party cloud APIs:
+
+1. **Paste Lyrics or Import Subtitle**: Paste song lyrics or import an existing `.lrc`, `.srt`, or `.ass` file.
+2. **Interactive Sync**: Play your video or audio and press `Space` at each spoken word. Word chips light up with timestamps.
+3. **Real-Time 60 FPS Preview**: Watch word-by-word active pop-in animations and glow wipes live over the video.
+4. **Export or Burn**: Download universal subtitle files or click **Burn & Export MP4** to encode styled text directly into the video stream.
+
 ---
 
 ## Advanced Video & Audio Tools
@@ -111,8 +130,8 @@ graph TD
 ### ◈ EBU R128 Loudness Normalization
 Broadcast and streaming normalization standard prevents quiet audio or sudden jarring peaks without introducing acoustic distortion. Recommended for podcasts, interviews, and multi-clip montages.
 
-### ◈ Subtitle Burn-In (`.srt` / `.vtt`)
-Upload external subtitle files to hardcode subtitles directly into the video stream. Subtitles are styled with crisp, high-contrast borders for legibility on all backgrounds.
+### ◈ Subtitle Burn-In (`.srt` / `.vtt` / `.ass`)
+Hardcode subtitles directly into the video stream. Subtitles are rendered with crisp, high-contrast borders for legibility on all backgrounds.
 
 ### ◈ Color & Style Grading
 Apply non-destructive visual filters during MP4 encoding:
@@ -140,9 +159,10 @@ Language preferences are automatically persisted in `localStorage` (`beetales-la
 Click the **User Guide & Help** button in the header to open a comprehensive, tabbed documentation modal covering:
 1. **Overview & Workflow**: Step-by-step conversion quickstart.
 2. **Formats & Modes**: Technical breakdown of codecs and settings.
-3. **Audio & Loudness**: Understanding EBU R128 and bitrates.
-4. **Video & Subtitles**: Guide to color filters, subtitles, and speed adjustments.
-5. **Local Privacy**: How browser WebAssembly protects confidential media.
+3. **Karaoke & Subtitles**: Guide to Tap-to-Sync and visual presets.
+4. **Audio & Loudness**: Understanding EBU R128 and bitrates.
+5. **Video & Subtitles**: Guide to color filters, subtitles, and speed adjustments.
+6. **Local Privacy**: How browser WebAssembly protects confidential media.
 
 ---
 
@@ -159,7 +179,7 @@ BeeTales includes a persistent session history and space savings calculator:
 ## Presets & Shareable Links
 
 - **Saved Presets**: Save custom configurations (e.g. *"Podcast Audio 192k"*, *"WebM to 720p MP4"*) to `localStorage` for instant one-click recall.
-- **Shareable URLs**: Click **Share link** to copy a URL containing all active settings encoded in the hash fragment (`#c=...`). Anyone opening the link will have the exact same settings preloaded automatically.
+- **Shareable URLs**: Click **Share link** to copy a URL containing all active settings encoded in query params (`?mode=...`). Anyone opening the link will have the exact same settings preloaded automatically.
 
 ---
 
@@ -168,7 +188,7 @@ BeeTales includes a persistent session history and space savings calculator:
 ```mermaid
 flowchart TD
     A[Select Media Files] --> B[Browser Validation & Metadata Inspection]
-    B --> C[Configure Mode, Bitrate, Loudness, Speed, Filters]
+    B --> C[Configure Mode, Bitrate, Loudness, Speed, Filters, Karaoke]
     C --> D[Load Local ffmpeg.wasm Engine]
     D --> E[Sequential In-Memory Processing]
     E --> F[Generate Temporary Blob Object URLs]
@@ -201,6 +221,7 @@ flowchart TD
 beetales-converter/
 ├── index.html            # Application markup, i18n data tags, and dialog structures
 ├── app.js                # Core controller: ffmpeg lifecycle, queue, UI orchestration
+├── karaoke-sync.js       # Karaoke state machine, tap-to-sync, ASS/SRT/LRC parsers & generator
 ├── translations.js       # Multi-language dictionary (EN, ES, PT, PL) & User Guide text
 ├── converter-utils.js    # Pure parsing, time formatting, crop filters, and calculations
 ├── style.css             # Base layout, typography, components, and responsive grid
@@ -208,7 +229,8 @@ beetales-converter/
 ├── assets/               # Mascot, hero artwork, logos, and textures
 ├── vendor/ffmpeg/        # Local ffmpeg.wasm browser engine and WebAssembly binaries
 └── test/
-    └── helpers.test.js   # Automated unit tests for converter utilities
+    ├── helpers.test.js   # Automated unit tests for converter utilities
+    └── karaoke.test.js   # Automated unit tests for karaoke engine & subtitle parsers
 ```
 
 ---
@@ -251,6 +273,8 @@ Tests validate:
 - Crop filter coordinate computations.
 - Safe filename generation and extension detection.
 - Byte and duration formatting helpers.
+- **Karaoke Sync Engine**: Word segmentation, tap recording, undo history, and 60fps render state.
+- **Subtitle Parsers & Exporters**: LRC, SRT, and ASS style generators with BGR color conversions.
 
 ---
 

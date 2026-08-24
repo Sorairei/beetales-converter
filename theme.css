@@ -1,60 +1,127 @@
+/* ==========================================================================
+   BeeTales — Industrial Circuit Theme
+   Palette derived from beetales-logo-v2.png:
+     · Deep forest green  : #040c06 / #081209
+     · Circuit green      : #6ec832 / #4a8a28  (logo border glow)
+     · Helmet gold/amber  : #f5a623 / #c87d1a  (constructor helmet)
+     · Cream/beige text   : #f2e8c6 / #e8ddb0  (logo lettering)
+     · Frog green mid     : #4caf3e            (frog body)
+   ========================================================================== */
+
 :root {
   color-scheme: dark;
-  --bg: #050b07;
-  --panel: #0a150d;
-  --panel-soft: #102317;
-  --panel-strong: #07110b;
-  --text: #c7d7a0;
-  --text-strong: #d0dfa7;
-  --muted: #8fa57a;
-  --line: #29402c;
-  --line-strong: #39563a;
-  --accent: #6e8f4a;
-  --accent-strong: #91bd59;
-  --accent-soft: #4d6e38;
-  --accent-ink: #07100b;
-  --amber: #c58a35;
-  --amber-strong: #e1a94d;
-  /* L-01: --blue removed from theme override; amber values are already under --amber / --amber-strong.
-     The base --blue: #818cf8 from style.css is intentionally preserved. */
-  --danger: #ff7b66;
-  --success: #91bd59;
-  --shadow: 0 28px 80px rgba(0, 8, 3, 0.55);
+
+  /* Backgrounds */
+  --bg:           #040c06;
+  --panel:        #081209;
+  --panel-soft:   #0d1e10;
+  --panel-strong: #050e07;
+
+  /* Typography */
+  --text:         #e8ddb0;   /* beige-cream — matches logo lettering */
+  --text-strong:  #f2e8c6;   /* brighter cream */
+  --muted:        #7a9a68;   /* muted forest green */
+
+  /* Borders */
+  --line:         #1a3620;
+  --line-strong:  #2a5030;
+
+  /* Circuit green accent (logo border glow) */
+  --accent:       #4a8a28;
+  --accent-strong:#6ec832;
+  --accent-soft:  #2d5c1a;
+  --accent-ink:   #030e04;   /* near-black text on green buttons */
+
+  /* Helmet gold accent */
+  --amber:        #c87d1a;
+  --amber-strong: #f5a623;
+
+  /* Functional */
+  --danger:  #e05a45;
+  --success: #6ec832;
+  --shadow:  0 28px 80px rgba(0, 6, 1, 0.68);
 }
 
+/* --------------------------------------------------------------------------
+   Base — html & body
+   -------------------------------------------------------------------------- */
+
 html {
-  background: #020604;
+  background: #020804;
 }
 
 body {
   isolation: isolate;
-  background-color: #020604;
+  background-color: #040c06;
   background-image:
-    linear-gradient(90deg, rgba(2, 6, 4, 0.78) 0%, rgba(2, 6, 4, 0.58) 48%, rgba(2, 6, 4, 0.38) 100%),
-    linear-gradient(180deg, rgba(2, 6, 4, 0.14), rgba(2, 6, 4, 0.48)),
-    url("assets/swamp-space.png");
-  background-position: center;
+    /* dark overlay so the UI stays readable over the detailed image */
+    linear-gradient(
+      180deg,
+      rgba(4, 12, 6, 0.72) 0%,
+      rgba(4, 12, 6, 0.52) 40%,
+      rgba(4, 12, 6, 0.64) 80%,
+      rgba(4, 12, 6, 0.88) 100%
+    ),
+    /* left-side vignette to anchor left panel */
+    linear-gradient(
+      90deg,
+      rgba(4, 12, 6, 0.48) 0%,
+      transparent 36%,
+      transparent 64%,
+      rgba(4, 12, 6, 0.36) 100%
+    ),
+    url("assets/beetales-bg-industrial.jpg");
+  background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
   color: var(--text);
 }
 
+/* Animated circuit-spark overlay — green nodes + amber sparks */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.28;
+  opacity: 0.22;
   mix-blend-mode: screen;
   background-image:
-    radial-gradient(circle, rgba(184, 255, 61, 0.85) 0 1px, transparent 2px),
-    radial-gradient(circle, rgba(145, 189, 89, 0.72) 0 1px, transparent 2.2px),
-    radial-gradient(circle, rgba(225, 169, 77, 0.65) 0 1px, transparent 2px);
-  background-size: 173px 191px, 257px 223px, 337px 281px;
-  background-position: 12px 18px, 83px 47px, 151px 101px;
-  animation: beetales-fireflies 24s linear infinite;
+    /* bright circuit-green dots */
+    radial-gradient(circle, rgba(110, 200, 50, 0.9)  0 1px, transparent 2px),
+    radial-gradient(circle, rgba(76,  175, 62, 0.75) 0 1px, transparent 2.2px),
+    /* helmet-gold spark dots */
+    radial-gradient(circle, rgba(245, 166, 35, 0.7)  0 1px, transparent 2px),
+    radial-gradient(circle, rgba(200, 125, 26, 0.55) 0 1px, transparent 1.8px);
+  background-size:
+    157px 179px,
+    241px 211px,
+    313px 267px,
+    197px 243px;
+  background-position:
+    18px 22px,
+    79px 53px,
+    141px 97px,
+    37px 133px;
+  animation: beetales-circuit-sparks 28s linear infinite;
+}
+
+@keyframes beetales-circuit-sparks {
+  0% {
+    background-position: 18px 22px, 79px 53px, 141px 97px, 37px 133px;
+    opacity: 0.16;
+  }
+  40% {
+    opacity: 0.26;
+  }
+  70% {
+    opacity: 0.18;
+  }
+  100% {
+    background-position: 64px -68px, 17px -78px, 198px -33px, 92px -54px;
+    opacity: 0.20;
+  }
 }
 
 .app-shell {
@@ -62,27 +129,20 @@ body::before {
   z-index: 1;
 }
 
-@keyframes beetales-fireflies {
-  0% {
-    background-position: 12px 18px, 83px 47px, 151px 101px;
-    opacity: 0.2;
-  }
-  45% {
-    opacity: 0.32;
-  }
-  100% {
-    background-position: 58px -73px, 21px -82px, 206px -39px;
-    opacity: 0.22;
-  }
-}
+/* --------------------------------------------------------------------------
+   Brand logo & hero
+   -------------------------------------------------------------------------- */
 
 .brand-logo {
   display: block;
   width: min(100%, 390px);
   height: auto;
-  filter: drop-shadow(0 14px 24px rgba(0, 4, 1, 0.5));
+  filter:
+    drop-shadow(0 8px 20px rgba(0, 6, 2, 0.65))
+    drop-shadow(0 0 32px rgba(110, 200, 50, 0.18));
 }
 
+/* Product heading card overlaid on the hero image */
 .product-heading {
   position: absolute;
   z-index: 2;
@@ -91,10 +151,15 @@ body::before {
   width: min(78%, 340px);
   margin: 0;
   padding: 18px 20px;
-  border-left: 2px solid var(--amber);
+  border-left: 2px solid var(--amber-strong);
   border-radius: 0 8px 8px 0;
-  background: linear-gradient(90deg, rgba(2, 8, 4, 0.92), rgba(2, 8, 4, 0.62) 72%, transparent);
-  text-shadow: 0 3px 16px rgba(0, 5, 2, 0.92);
+  background: linear-gradient(
+    90deg,
+    rgba(3, 10, 4, 0.94),
+    rgba(4, 12, 6, 0.66) 72%,
+    transparent
+  );
+  text-shadow: 0 2px 14px rgba(0, 6, 2, 0.96);
 }
 
 .product-heading span {
@@ -102,8 +167,8 @@ body::before {
   margin-bottom: 8px;
   color: var(--amber-strong);
   font-size: 0.76rem;
-  font-weight: 700; /* L-02: was 750 — non-standard; browsers silently round to 700 without variable-font axis */
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -114,19 +179,27 @@ legend,
   color: var(--text-strong);
 }
 
+/* Hero visual frame */
 .swamp-hero {
   width: min(100%, 520px);
   margin-top: 24px;
-  border-color: rgba(57, 86, 58, 0.7);
+  border-color: rgba(46, 80, 48, 0.65);
   background: var(--panel-strong);
-  box-shadow: 0 24px 70px rgba(0, 8, 3, 0.42), inset 0 1px rgba(199, 215, 160, 0.04);
+  box-shadow:
+    0 24px 70px rgba(0, 8, 2, 0.52),
+    inset 0 1px rgba(110, 200, 50, 0.06);
 }
 
 .swamp-hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(1, 6, 3, 0.14), transparent 42%, rgba(1, 6, 3, 0.2));
+  background: linear-gradient(
+    180deg,
+    rgba(2, 8, 3, 0.18),
+    transparent 38%,
+    rgba(2, 8, 3, 0.28)
+  );
   pointer-events: none;
 }
 
@@ -134,6 +207,10 @@ legend,
   aspect-ratio: 1717 / 916;
   object-fit: cover;
 }
+
+/* --------------------------------------------------------------------------
+   Typography & utility text colours
+   -------------------------------------------------------------------------- */
 
 .lead,
 .drop-hint,
@@ -146,79 +223,117 @@ legend,
   color: var(--muted);
 }
 
+/* --------------------------------------------------------------------------
+   Format badge strip
+   -------------------------------------------------------------------------- */
+
 .format-strip span {
-  border-color: var(--line);
-  background: rgba(16, 35, 23, 0.68);
+  border-color: var(--line-strong);
+  background: rgba(14, 30, 16, 0.72);
   color: var(--text-strong);
+  text-shadow: 0 0 8px rgba(110, 200, 50, 0.2);
 }
 
+/* --------------------------------------------------------------------------
+   Privacy note
+   -------------------------------------------------------------------------- */
+
 .privacy-note {
-  border-color: rgba(110, 143, 74, 0.38);
+  border-color: rgba(74, 138, 40, 0.35);
   background:
-    radial-gradient(circle at 9% 22%, rgba(144, 169, 110, 0.12), transparent 44%),
-    linear-gradient(135deg, rgba(16, 35, 23, 0.94), rgba(7, 17, 11, 0.97));
+    radial-gradient(circle at 9% 22%, rgba(110, 200, 50, 0.09), transparent 46%),
+    linear-gradient(135deg, rgba(13, 30, 16, 0.96), rgba(5, 14, 7, 0.98));
   color: var(--text);
-  box-shadow: 0 18px 42px rgba(0, 7, 2, 0.32), inset 0 1px rgba(199, 215, 160, 0.04);
+  box-shadow:
+    0 18px 42px rgba(0, 8, 2, 0.38),
+    inset 0 1px rgba(110, 200, 50, 0.05);
 }
 
 .privacy-mascot {
   width: 118px;
-  filter: drop-shadow(0 14px 22px rgba(0, 6, 2, 0.5));
+  filter: drop-shadow(0 12px 20px rgba(0, 8, 2, 0.55));
 }
 
-.privacy-note strong {
-  color: var(--text-strong);
-}
-
-.privacy-note p {
-  color: var(--muted);
-}
+.privacy-note strong { color: var(--text-strong); }
+.privacy-note p      { color: var(--muted); }
 
 .privacy-note li {
-  border-color: rgba(110, 143, 74, 0.28);
-  background: rgba(110, 143, 74, 0.1);
+  border-color: rgba(74, 138, 40, 0.26);
+  background: rgba(74, 138, 40, 0.09);
   color: var(--text);
 }
 
+/* --------------------------------------------------------------------------
+   Sponsor button
+   -------------------------------------------------------------------------- */
+
 .sponsor-button {
   color: #ffe2a5;
-  border-color: rgba(197, 138, 53, 0.46);
-  background: rgba(143, 113, 60, 0.1);
+  border-color: rgba(200, 125, 26, 0.44);
+  background: rgba(120, 90, 20, 0.1);
 }
 
-.sponsor-button span {
-  color: var(--amber-strong);
-}
+.sponsor-button span { color: var(--amber-strong); }
 
 .sponsor-button:hover {
-  color: #fff0c7;
-  border-color: rgba(225, 169, 77, 0.72);
-  background: rgba(197, 138, 53, 0.17);
+  color: #fff3cc;
+  border-color: rgba(245, 166, 35, 0.68);
+  background: rgba(200, 125, 26, 0.18);
 }
 
+/* --------------------------------------------------------------------------
+   Converter panel  — the main form card
+   -------------------------------------------------------------------------- */
+
 .converter-panel {
-  border-color: rgba(57, 86, 58, 0.68);
-  background: linear-gradient(180deg, rgba(199, 215, 160, 0.035), transparent 22%), var(--panel);
-  box-shadow: var(--shadow), inset 0 1px rgba(199, 215, 160, 0.04);
+  border-color: rgba(42, 80, 48, 0.65);
+  background:
+    /* subtle amber top glow — nod to the logo's golden helmet */
+    linear-gradient(
+      180deg,
+      rgba(245, 166, 35, 0.04) 0%,
+      rgba(110, 200, 50, 0.03) 8%,
+      transparent 24%
+    ),
+    var(--panel);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px rgba(110, 200, 50, 0.06),
+    /* left circuit-line accent */
+    inset 3px 0 0 rgba(110, 200, 50, 0.12);
 }
+
+/* --------------------------------------------------------------------------
+   Drop zone
+   -------------------------------------------------------------------------- */
 
 .drop-zone {
   border-color: var(--line-strong);
-  background: linear-gradient(180deg, rgba(110, 143, 74, 0.075), transparent 48%), var(--panel-strong);
+  background:
+    linear-gradient(180deg, rgba(74, 138, 40, 0.06), transparent 48%),
+    var(--panel-strong);
 }
 
 .drop-zone:hover,
 .drop-zone.is-dragging {
-  border-color: rgba(145, 189, 89, 0.52);
-  background: linear-gradient(180deg, rgba(110, 143, 74, 0.13), transparent 55%), var(--panel-strong);
-  box-shadow: 0 0 0 4px rgba(110, 143, 74, 0.12);
+  border-color: rgba(110, 200, 50, 0.55);
+  background:
+    linear-gradient(180deg, rgba(74, 138, 40, 0.12), transparent 56%),
+    var(--panel-strong);
+  box-shadow:
+    0 0 0 4px rgba(74, 138, 40, 0.13),
+    0 0 24px rgba(110, 200, 50, 0.08);
 }
 
 .drop-icon {
-  border-color: rgba(145, 189, 89, 0.58);
-  background: rgba(110, 143, 74, 0.14);
+  border-color: rgba(110, 200, 50, 0.55);
+  background: rgba(74, 138, 40, 0.13);
   color: var(--accent-strong);
 }
+
+/* --------------------------------------------------------------------------
+   File list & cards
+   -------------------------------------------------------------------------- */
 
 .drop-title,
 .file-name,
@@ -233,18 +348,31 @@ legend,
   background: var(--panel-soft);
 }
 
+.file-list { border-color: var(--line); }
+
+.file-list li {
+  background: rgba(110, 200, 50, 0.03);
+}
+
+/* Status state text (Loading, Converting, Completed) */
+.file-list em { color: var(--amber-strong); }
+
+.clear-button,
+.file-list button { color: var(--muted); }
+
+.file-label { color: var(--accent-strong); }
+
+/* --------------------------------------------------------------------------
+   Video preview & crop
+   -------------------------------------------------------------------------- */
+
 .crop-container {
   border-radius: 6px;
-  background: #05070b;
+  background: #020804;
 }
 
-.crop-box {
-  border-color: var(--accent-strong);
-}
-
-.crop-handle {
-  background: var(--accent-strong);
-}
+.crop-box    { border-color: var(--accent-strong); }
+.crop-handle { background:   var(--accent-strong); }
 
 .crop-action-button {
   border-color: var(--line);
@@ -254,52 +382,35 @@ legend,
 
 .crop-action-button:hover {
   border-color: var(--accent-strong);
-  background: rgba(110, 143, 74, 0.1);
+  background: rgba(74, 138, 40, 0.1);
   color: var(--text);
 }
 
 .preview-meta-bar .meta-tag {
-  background: rgba(199, 215, 160, 0.08);
+  background: rgba(110, 200, 50, 0.09);
   color: var(--muted);
 }
 
 .frame-nav-button {
-  border-color: rgba(199, 215, 160, 0.2);
-  background: rgba(2, 6, 4, 0.7);
+  border-color: rgba(232, 221, 176, 0.18);
+  background: rgba(3, 9, 4, 0.72);
   color: var(--muted);
 }
 
 .frame-nav-button:hover {
-  background: rgba(2, 6, 4, 0.9);
+  background: rgba(3, 9, 4, 0.9);
   color: var(--text);
 }
 
 .timeline-canvas,
 .waveform-canvas {
-  background: rgba(3, 8, 5, 0.5);
-  border: 1px solid rgba(57, 86, 58, 0.25);
+  background: rgba(3, 9, 4, 0.5);
+  border: 1px solid rgba(42, 80, 48, 0.3);
 }
 
-.file-label {
-  color: var(--accent-strong);
-}
-
-.file-list {
-  border-color: var(--line);
-}
-
-.file-list li {
-  background: rgba(199, 215, 160, 0.035);
-}
-
-.file-list em {
-  color: var(--amber-strong);
-}
-
-.clear-button,
-.file-list button {
-  color: var(--muted);
-}
+/* --------------------------------------------------------------------------
+   Settings controls
+   -------------------------------------------------------------------------- */
 
 .setting-select,
 .time-grid input,
@@ -313,7 +424,7 @@ legend,
 .setting-select:focus,
 .time-grid input:focus {
   border-color: var(--accent-strong);
-  box-shadow: 0 0 0 4px rgba(110, 143, 74, 0.14);
+  box-shadow: 0 0 0 4px rgba(74, 138, 40, 0.15);
 }
 
 .time-grid label > span,
@@ -322,23 +433,24 @@ legend,
   color: var(--muted);
 }
 
-.mode-control strong {
-  color: var(--text-strong);
-}
+.mode-control strong { color: var(--text-strong); }
 
 .mode-control span:hover,
 .segmented-control span:hover {
-  border-color: rgba(145, 189, 89, 0.46);
-  background: rgba(110, 143, 74, 0.07);
+  border-color: rgba(110, 200, 50, 0.44);
+  background: rgba(74, 138, 40, 0.07);
   color: var(--text-strong);
 }
 
+/* Active / checked state — bright circuit-green fill */
 .mode-control input:checked + span,
 .segmented-control input:checked + span {
   color: var(--accent-ink);
-  border-color: rgba(145, 189, 89, 0.64);
+  border-color: rgba(110, 200, 50, 0.7);
   background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  box-shadow: 0 8px 24px rgba(42, 72, 38, 0.32);
+  box-shadow:
+    0 6px 20px rgba(28, 72, 20, 0.38),
+    0 0 12px rgba(110, 200, 50, 0.18);
 }
 
 .mode-control input:checked + span strong,
@@ -346,106 +458,151 @@ legend,
   color: var(--accent-ink);
 }
 
+/* --------------------------------------------------------------------------
+   Notes / hints
+   -------------------------------------------------------------------------- */
+
 .mp4-note,
 .gif-note {
-  border-color: rgba(110, 143, 74, 0.3);
-  background: rgba(110, 143, 74, 0.075);
+  border-color: rgba(74, 138, 40, 0.28);
+  background: rgba(74, 138, 40, 0.07);
   color: var(--text);
 }
+
+/* --------------------------------------------------------------------------
+   Buttons — primary action (circuit green)
+   -------------------------------------------------------------------------- */
 
 .primary-button {
   color: var(--accent-ink);
   background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  box-shadow: 0 16px 34px rgba(28, 57, 30, 0.38);
+  box-shadow:
+    0 14px 32px rgba(20, 56, 16, 0.42),
+    0 0 18px rgba(110, 200, 50, 0.14);
+  transition: box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .primary-button:hover {
-  background: linear-gradient(180deg, #a8be82, #78964b);
-  box-shadow: 0 18px 38px rgba(35, 66, 35, 0.42);
+  background: linear-gradient(180deg, #82d43e, #55962e);
+  box-shadow:
+    0 18px 38px rgba(26, 68, 20, 0.48),
+    0 0 28px rgba(110, 200, 50, 0.22);
 }
+
+/* --------------------------------------------------------------------------
+   Buttons — download (helmet amber/gold)
+   -------------------------------------------------------------------------- */
 
 .download-button,
 .open-button,
 .result-card a {
-  color: #1b1303;
+  color: #180f02;
   background: linear-gradient(180deg, var(--amber-strong), var(--amber));
+  box-shadow: 0 8px 20px rgba(100, 52, 4, 0.3);
 }
 
 .download-button:hover,
 .open-button:hover,
 .result-card a:hover {
-  color: #1b1303;
-  background: linear-gradient(180deg, #efbd68, #ca913c);
+  color: #180f02;
+  background: linear-gradient(180deg, #ffc040, #d98820);
+  box-shadow: 0 10px 26px rgba(120, 64, 6, 0.38);
 }
 
+/* Download all — ghost style */
 .download-all-button {
   color: #ffe2a5;
-  border-color: rgba(197, 138, 53, 0.42);
-  background: rgba(197, 138, 53, 0.1);
+  border-color: rgba(200, 125, 26, 0.4);
+  background: rgba(200, 125, 26, 0.09);
 }
 
 .download-all-button:hover {
-  background: rgba(197, 138, 53, 0.18);
+  background: rgba(200, 125, 26, 0.17);
+  border-color: rgba(245, 166, 35, 0.6);
 }
 
-.results-tools > span {
-  color: var(--success);
-}
+/* --------------------------------------------------------------------------
+   Results
+   -------------------------------------------------------------------------- */
+
+.results-tools > span { color: var(--success); }
 
 .result-card {
-  border-color: rgba(145, 189, 89, 0.22);
-  background: rgba(110, 143, 74, 0.06);
+  border-color: rgba(110, 200, 50, 0.2);
+  background: rgba(74, 138, 40, 0.055);
 }
 
+/* --------------------------------------------------------------------------
+   Progress bar
+   -------------------------------------------------------------------------- */
+
 .progress-track {
-  border-color: rgba(199, 215, 160, 0.06);
-  background: #030805;
+  border-color: rgba(232, 221, 176, 0.05);
+  background: #020804;
 }
 
 .progress-bar {
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong), var(--amber));
+  background: linear-gradient(
+    90deg,
+    var(--accent)        0%,
+    var(--accent-strong) 55%,
+    var(--amber-strong)  100%
+  );
+  box-shadow: 0 0 10px rgba(110, 200, 50, 0.28);
 }
+
+/* --------------------------------------------------------------------------
+   Floating reset button
+   -------------------------------------------------------------------------- */
 
 .reset-floating-button {
-  border-color: rgba(110, 143, 74, 0.5);
-  background: rgba(7, 17, 11, 0.94);
+  border-color: rgba(74, 138, 40, 0.5);
+  background: rgba(5, 14, 7, 0.95);
   color: var(--text-strong);
-  box-shadow: 0 14px 34px rgba(0, 8, 3, 0.48);
+  box-shadow: 0 12px 32px rgba(0, 8, 2, 0.52);
 }
 
-.reset-floating-button span {
-  color: var(--amber-strong);
-}
+.reset-floating-button span  { color: var(--amber-strong); }
 
 .reset-floating-button:hover {
   border-color: var(--accent-strong);
-  background: rgba(16, 35, 23, 0.98);
+  background: rgba(13, 30, 16, 0.98);
+  box-shadow:
+    0 14px 36px rgba(0, 8, 2, 0.58),
+    0 0 12px rgba(110, 200, 50, 0.1);
 }
+
+/* --------------------------------------------------------------------------
+   Site footer
+   -------------------------------------------------------------------------- */
 
 .site-footer {
-  border-color: rgba(57, 86, 58, 0.48);
-  color: #718466;
+  border-color: rgba(42, 80, 48, 0.44);
+  color: #5a7a52;
 }
 
-.site-footer a {
-  color: var(--muted);
-}
+.site-footer a       { color: var(--muted); }
+.site-footer a:hover { color: var(--text-strong); }
 
-.site-footer a:hover {
-  color: var(--text-strong);
-}
+/* --------------------------------------------------------------------------
+   Focus rings — circuit green
+   -------------------------------------------------------------------------- */
 
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(145, 189, 89, 0.42);
+  outline: 3px solid rgba(110, 200, 50, 0.45);
   outline-offset: 3px;
 }
 
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
 @media (max-width: 700px) {
   body {
-    background-position: 62% center;
+    background-position: 60% center;
     background-attachment: scroll;
   }
 
@@ -468,6 +625,10 @@ select:focus-visible {
     width: 82px;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   body::before {

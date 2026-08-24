@@ -108,6 +108,8 @@ let trimOverlayHandle = null;
 let trimOverlayDragStartX = 0;
 let trimOverlayDragStartRange = null;
 let cachedAccentColor = "#91bd59";
+let decodeAbortController = null; // C-02: serialise concurrent decodeAudio calls
+let thumbnailAbortToken = 0; // C-03: incremented to cancel in-progress thumbnail generation
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
@@ -298,6 +300,8 @@ async function convertQueue() {
   try {
     cancelRequested = false;
     setBusy(true);
+    thumbnailAbortToken++; // C-03: signal thumbnail generation to abort
+    releaseFfmpegMemory(); // C-03: terminate any in-flight thumbnail ffmpeg worker for a clean slate
     await loadFfmpeg();
     for (activeFileIndex = 0; activeFileIndex < selectedFiles.length; activeFileIndex += 1) {
       const file = selectedFiles[activeFileIndex];
@@ -364,6 +368,7 @@ function resetPreview() {
   previewPanel.classList.add("is-hidden");
   resetCrop();
   cropActions.classList.add("is-hidden");
+  revokeThumbnailUrls(); // C-01: free thumbnail blob URLs before clearing the array
   thumbnailImages = [];
   timelineReady = false;
   timelineCanvas.classList.add("is-hidden");
@@ -418,13 +423,22 @@ function updatePreviewMetadata(file) {
   previewMeta.innerHTML = formatMediaMetadata(fileMetadata.get(file));
 }
 
+// C-04: escape any user-derived values inserted into HTML to prevent injection
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function formatMediaMetadata(metadata) {
   if (!metadata || !Number.isFinite(metadata.duration)) return "Details unavailable";
   const parts = [];
-  if (metadata.codec) parts.push(`<span class="meta-tag">${metadata.codec}</span>`);
-  if (metadata.width && metadata.height) parts.push(`<span class="meta-tag">${metadata.height}p</span>`);
-  if (metadata.fps) parts.push(`<span class="meta-tag">${metadata.fps} fps</span>`);
-  parts.push(`<span class="meta-tag">${formatDuration(metadata.duration)}</span>`);
+  if (metadata.codec) parts.push(`<span class="meta-tag">${escapeHtml(metadata.codec)}</span>`);
+  if (metadata.width && metadata.height) parts.push(`<span class="meta-tag">${escapeHtml(metadata.height)}p</span>`);
+  if (metadata.fps) parts.push(`<span class="meta-tag">${escapeHtml(metadata.fps)} fps</span>`);
+  parts.push(`<span class="meta-tag">${escapeHtml(formatDuration(metadata.duration))}</span>`);
   return parts.join("");
 }
 
@@ -568,7 +582,11 @@ function getGifDurationError(trim) {
   const durations = selectedFiles.map((file) => fileMetadata.get(file)?.duration).filter(Number.isFinite);
   if (!durations.length) return "";
   const start = trim.start || 0;
-  const requestedDuration = trim.end !== undefined ? trim.end - start : Math.max(...durations.map((duration) => duration - start));
+  // M-06: clamp individual durations to 0 so start > duration yields 0, not negative
+  const requestedDuration = trim.end !== undefined
+    ? trim.end - start
+    : Math.max(...durations.map((duration) => Math.max(0, duration - start)));
+  if (requestedDuration <= 0) return "The selected start time is past the end of all files.";
   return requestedDuration > 15 ? "GIF clips are limited to 15 seconds. Enter an End time no more than 15 seconds after Start time." : "";
 }
 
@@ -725,12 +743,16 @@ function getFriendlyError(error, mode) {
 }
 
 function getValidationMessage(mode) { return mode === "mp4" ? "Please select one or more .webm or .mp4 video files." : "The selected files do not appear to be compatible videos."; }
-function getCheckedValue(name) { return document.querySelector(`input[name="${name}"]:checked`).value; }
+// M-01: use optional chaining so a missing :checked radio returns "" instead of throwing TypeError
+function getCheckedValue(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value ?? ""; }
 function getMode() { return getCheckedValue("mode"); }
 function isValidFileForMode(file, mode) { return mode === "mp4" ? isMp4SourceFile(file) : isVideoFile(file); }
-function isVideoFile(file) { return file.type.startsWith("video/") || ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"].includes(getFileExtension(file.name)); }
-function isWebmFile(file) { return file.type === "video/webm" || getFileExtension(file.name) === "webm"; }
-function isMp4SourceFile(file) { return isWebmFile(file) || file.type === "video/mp4" || getFileExtension(file.name) === "mp4"; }
+// M-07: centralised extension/type lists — add a new format in one place only
+const VIDEO_EXTENSIONS = ["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm"];
+const MP4_SOURCE_EXTENSIONS = ["webm", "mp4"];
+const MP4_SOURCE_TYPES = ["video/webm", "video/mp4"];
+function isVideoFile(file) { return file.type.startsWith("video/") || VIDEO_EXTENSIONS.includes(getFileExtension(file.name)); }
+function isMp4SourceFile(file) { return MP4_SOURCE_TYPES.includes(file.type) || MP4_SOURCE_EXTENSIONS.includes(getFileExtension(file.name)); }
 function getOutputName(name, mode) {
   if (mode === "gif") {
     const ext = getGifOutputExtension();
@@ -1008,10 +1030,19 @@ function handleTimelineHoverEnd() {
   }
 }
 
+// C-01: revoke all blob URLs held by the thumbnail image array
+function revokeThumbnailUrls() {
+  thumbnailImages.forEach((img) => {
+    if (img?.src?.startsWith("blob:")) URL.revokeObjectURL(img.src);
+  });
+}
+
 async function generateThumbnails(file) {
   if (!file || timelineReady) return;
+  revokeThumbnailUrls(); // C-01: free blob URLs from any previous thumbnail run
   thumbnailImages = [];
   timelineReady = false;
+  const myToken = ++thumbnailAbortToken; // C-03: stamp this generation run
   timelineCanvas.classList.remove("is-hidden");
   const dpr = window.devicePixelRatio || 1;
   timelineCanvas.width = timelineCanvas.clientWidth * dpr;
@@ -1027,10 +1058,14 @@ async function generateThumbnails(file) {
   timelineCtx.textAlign = "center";
   timelineCtx.fillText("Loading thumbnails...", cw / 2, ch / 2 + 3);
 
+  const inputName = `thumb-input.${getFileExtension(file.name) || "video"}`;
+  let wroteInput = false;
   try {
     await loadFfmpeg();
-    const inputName = `thumb-input.${getFileExtension(file.name) || "video"}`;
+    if (thumbnailAbortToken !== myToken) return; // C-03: bail if conversion already started
     await ffmpeg.writeFile(inputName, await fetchFile(file));
+    wroteInput = true;
+    if (thumbnailAbortToken !== myToken) return;
     const duration = fileMetadata.get(file)?.duration || videoPreview.duration || 10;
     const interval = duration / (TIMELINE_THUMBNAILS + 1);
     const promises = [];
@@ -1041,31 +1076,47 @@ async function generateThumbnails(file) {
         ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName])
           .then(() => ffmpeg.readFile(outName))
           .then((data) => {
+            if (thumbnailAbortToken !== myToken) return; // C-03: discard result if cancelled
             const blob = new Blob([data], { type: "image/jpeg" });
+            const blobUrl = URL.createObjectURL(blob);
             const img = new Image();
-            img.src = URL.createObjectURL(blob);
+            img.onload = () => URL.revokeObjectURL(blobUrl); // C-01: release URL right after decode
+            img.src = blobUrl;
             thumbnailImages[i - 1] = img;
           })
           .catch(() => {})
       );
     }
     await Promise.all(promises);
-    await cleanupFiles(inputName);
-    for (let i = 1; i <= TIMELINE_THUMBNAILS; i++) {
-      try { await ffmpeg.deleteFile(`thumb-${i}.jpg`); } catch {}
-    }
+    if (thumbnailAbortToken !== myToken) return;
     timelineReady = true;
     refreshAccentColor();
     initTrimOverlay();
     drawTimeline();
   } catch {
     timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+  } finally {
+    // M-03: always purge MEMFS entries — even when Promise.all or loadFfmpeg throws
+    const cleanupTasks = Array.from({ length: TIMELINE_THUMBNAILS }, (_, i) =>
+      ffmpeg.deleteFile(`thumb-${i + 1}.jpg`).catch(() => {})
+    );
+    if (wroteInput) cleanupTasks.push(cleanupFiles(inputName).catch(() => {}));
+    await Promise.all(cleanupTasks);
   }
 }
 
 function drawTimeline() {
+  const dpr = window.devicePixelRatio || 1;
   const w = timelineCanvas.clientWidth;
   const h = timelineCanvas.clientHeight;
+  // M-05: re-sync canvas pixel dimensions when DPR or element size changes (e.g. window resize)
+  const expectedW = Math.round(w * dpr);
+  const expectedH = Math.round(h * dpr);
+  if (timelineCanvas.width !== expectedW || timelineCanvas.height !== expectedH) {
+    timelineCanvas.width = expectedW;
+    timelineCanvas.height = expectedH;
+    timelineCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
   timelineCtx.clearRect(0, 0, w, h);
   timelineCtx.fillStyle = "rgba(0,0,0,0.4)";
   timelineCtx.fillRect(0, 0, w, h);
@@ -1116,15 +1167,32 @@ function drawWaveform() {
 }
 
 async function decodeAudio(file) {
-  if (audioContext) { try { audioContext.close(); } catch {} }
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const arrayBuffer = await file.arrayBuffer();
-  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  waveformReady = true;
-  waveformCanvas.width = waveformCanvas.clientWidth * (window.devicePixelRatio || 1);
-  waveformCanvas.height = waveformCanvas.clientHeight * (window.devicePixelRatio || 1);
-  waveformCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-  drawWaveform();
+  // C-02: abort any pending decode and ensure only one AudioContext exists at a time
+  if (decodeAbortController) decodeAbortController.abort();
+  decodeAbortController = new AbortController();
+  const { signal } = decodeAbortController;
+
+  if (audioContext) {
+    try { await audioContext.close(); } catch { /* already closed or suspended */ }
+    audioContext = null;
+  }
+
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  audioContext = ctx;
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    if (signal.aborted) return;
+    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    if (signal.aborted) return;
+    waveformReady = true;
+    waveformCanvas.width = waveformCanvas.clientWidth * (window.devicePixelRatio || 1);
+    waveformCanvas.height = waveformCanvas.clientHeight * (window.devicePixelRatio || 1);
+    waveformCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    drawWaveform();
+  } catch (err) {
+    if (!signal.aborted) console.warn("Audio decode failed:", err);
+  }
 }
 
 function getGifOutputExtension() {
@@ -1255,7 +1323,8 @@ function handleTrimInputChange() {
   const startSec = parsed.start || 0;
   const endSec = parsed.end || duration;
   if (endSec <= startSec) return;
-  clampTrimRange(startSec, endSec);
+  const clamped = clampTrimRange(startSec, endSec); // M-02: capture and apply the clamped values
+  syncTrimInputs(clamped.startSec, clamped.endSec); // M-02: keep text inputs in sync with clamped range
   drawTimeline();
 }
 

@@ -128,7 +128,7 @@
               <span class="preview-meta-bar" id="preview-meta"></span>
             </div>
             <div class="crop-container" id="crop-container">
-              <video id="video-preview" controls preload="metadata"></video>
+              <video id="video-preview" controls preload="none"><!-- L-03: src is always a local blob URL, so eager preload is unnecessary --></video>
               <div class="frame-nav" id="frame-nav">
                 <button class="frame-nav-button" id="frame-prev" type="button" aria-label="Previous frame" title="Previous frame">&#9664;</button>
                 <button class="frame-nav-button" id="frame-next" type="button" aria-label="Next frame" title="Next frame">&#9654;</button>

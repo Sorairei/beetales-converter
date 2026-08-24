@@ -82,7 +82,7 @@ a {
 
 .site-footer a {
   color: #a9b4c5;
-  font-weight: 750;
+  font-weight: 700; /* L-02: was 750 — non-standard value; browsers silently round to 700 without Inter Variable font axis */
   text-decoration: none;
 }
 

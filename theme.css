@@ -15,7 +15,8 @@
   --accent-ink: #07100b;
   --amber: #c58a35;
   --amber-strong: #e1a94d;
-  --blue: #c58a35;
+  /* L-01: --blue removed from theme override; amber values are already under --amber / --amber-strong.
+     The base --blue: #818cf8 from style.css is intentionally preserved. */
   --danger: #ff7b66;
   --success: #91bd59;
   --shadow: 0 28px 80px rgba(0, 8, 3, 0.55);
@@ -101,7 +102,7 @@ body::before {
   margin-bottom: 8px;
   color: var(--amber-strong);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700; /* L-02: was 750 — non-standard; browsers silently round to 700 without variable-font axis */
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }

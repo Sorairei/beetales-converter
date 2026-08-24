@@ -48,7 +48,7 @@ const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], #video-quality, #video-resolution, #gif-width, #gif-fps');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed');
 
 const cropContainer = $("#crop-container");
 const cropOverlay = $("#crop-overlay");
@@ -69,6 +69,19 @@ const timelineCanvas = $("#timeline-canvas");
 const waveformCanvas = $("#waveform-canvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const waveformCtx = waveformCanvas.getContext("2d");
+
+// Sprint 1 new feature DOM refs
+const saveFrameBar = $("#save-frame-bar");
+const saveFrameButton = $("#save-frame-button");
+const presetsList = $("#presets-list");
+const savePresetButton = $("#save-preset-button");
+const savePresetInline = $("#save-preset-inline");
+const presetNameInput = $("#preset-name-input");
+const presetConfirm = $("#preset-confirm");
+const presetCancel = $("#preset-cancel");
+const loudnessNormalize = $("#loudness-normalize");
+const videoSpeed = $("#video-speed");
+const gifSpeed = $("#gif-speed");
 
 const FRAME_STEP = 1 / 30;
 const TIMELINE_THUMBNAILS = 12;
@@ -182,6 +195,7 @@ videoPreview.addEventListener("timeupdate", () => {
 });
 restorePreferences();
 updateModeUI({ resetFiles: false });
+renderPresets();
 
 async function handleFiles(fileCollection) {
   if (conversionInProgress) return;
@@ -357,6 +371,7 @@ function showPreview(file) {
   previewTitle.textContent = file.name;
   previewMeta.textContent = "Loading details...";
   previewPanel.classList.remove("is-hidden");
+  if (getMode() !== "audio") saveFrameBar.classList.remove("is-hidden");
 }
 
 function resetPreview() {
@@ -377,6 +392,7 @@ function resetPreview() {
   trimOverlayActive = false;
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
+  saveFrameBar.classList.add("is-hidden");
 }
 
 function loadMediaMetadata(file) {
@@ -487,7 +503,9 @@ async function convertToWebP(file, index, trim) {
     await ffmpeg.writeFile(inputName, await fetchFile(file));
     wroteInput = true;
     const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
-    const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
+    const speedVal = parseFloat(gifSpeed?.value) || 1;
+    const speedPrefix = speedVal !== 1 ? `setpts=PTS/${speedVal},` : "";
+    const baseFilter = `${speedPrefix}fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
     const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
     const args = ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter}`, "-loop", "0", "-f", "webp", "-lossless", "0", "-quality", "90", outputName];
     const exitCode = await ffmpeg.exec(args);
@@ -545,22 +563,32 @@ function downloadAllResults() {
 function getAudioArgs(inputName, outputName, trim) {
   const format = getCheckedValue("format");
   const bitrate = getCheckedValue("bitrate");
-  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), ...audioOutputArgs[format], ...(format === "wav" ? [] : ["-b:a", bitrate]), outputName];
+  const loudnessArgs = loudnessNormalize?.checked
+    ? ["-af", "loudnorm=I=-16:LRA=11:TP=-1.5"]
+    : [];
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), ...audioOutputArgs[format], ...(format === "wav" ? [] : ["-b:a", bitrate]), ...loudnessArgs, outputName];
 }
 
 function getMp4Args(inputName, outputName, encoder, trim) {
   const crf = videoQuality.value;
   const fallbackQuality = crf === "18" ? "3" : crf === "28" ? "8" : "5";
   const videoArgs = encoder === "mpeg4" ? ["-c:v", "mpeg4", "-q:v", fallbackQuality] : ["-c:v", "libx264", "-preset", "veryfast", "-crf", crf];
-  const scaleArgs = videoResolution.value === "original" ? [] : ["-vf", `scale=w=-2:h=${videoResolution.value}:force_original_aspect_ratio=decrease`];
-  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, ...scaleArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
+  const speedVal = parseFloat(videoSpeed?.value) || 1;
+  const videoFilters = [];
+  if (speedVal !== 1) videoFilters.push(`setpts=PTS/${speedVal}`);
+  if (videoResolution.value !== "original") videoFilters.push(`scale=w=-2:h=${videoResolution.value}:force_original_aspect_ratio=decrease`);
+  const vfArgs = videoFilters.length ? ["-vf", videoFilters.join(",")] : [];
+  const audioSpeedArgs = speedVal !== 1 ? ["-af", getAtempoChain(speedVal)] : [];
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, ...vfArgs, ...audioSpeedArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
 }
 
 function getGifArgs(inputName, outputName, trim) {
   const cropFilter = cropActive && cropRect ? getGifCropFilter() : "";
-  const baseFilter = `fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
+  const speedVal = parseFloat(gifSpeed?.value) || 1;
+  const speedPrefix = speedVal !== 1 ? `setpts=PTS/${speedVal},` : "";
+  const baseFilter = `${speedPrefix}fps=${gifFps.value},scale=${gifWidth.value}:-1:flags=lanczos`;
   const filter = cropFilter ? `${cropFilter},${baseFilter}` : baseFilter;
-    return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter},split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`, "-loop", "0", "-f", "gif", outputName];
+  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-filter_complex", `[0:v]${filter},split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`, "-loop", "0", "-f", "gif", outputName];
 }
 
 function getGifCropFilter() {
@@ -637,6 +665,9 @@ function savePreferences() {
     resolution: videoResolution.value,
     gifWidth: gifWidth.value,
     gifFps: gifFps.value,
+    speed: videoSpeed?.value ?? "1",
+    gifSpeedVal: gifSpeed?.value ?? "1",
+    loudness: loudnessNormalize?.checked ?? false,
   };
   try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
 }
@@ -653,6 +684,9 @@ function restorePreferences() {
     setSelectValue(videoResolution, preferences.resolution);
     setSelectValue(gifWidth, preferences.gifWidth);
     setSelectValue(gifFps, preferences.gifFps);
+    if (videoSpeed && preferences.speed) setSelectValue(videoSpeed, preferences.speed);
+    if (gifSpeed && preferences.gifSpeedVal) setSelectValue(gifSpeed, preferences.gifSpeedVal);
+    if (loudnessNormalize && preferences.loudness !== undefined) loudnessNormalize.checked = !!preferences.loudness;
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
@@ -666,6 +700,9 @@ function restoreAllDefaults() {
   videoResolution.value = "original";
   gifWidth.value = "480";
   gifFps.value = "12";
+  if (videoSpeed) videoSpeed.value = "1";
+  if (gifSpeed) gifSpeed.value = "1";
+  if (loudnessNormalize) loudnessNormalize.checked = false;
   trimStart.value = "";
   trimEnd.value = "";
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
@@ -714,6 +751,12 @@ function updateModeUI({ resetFiles }) {
   if (resetFiles) clearSelection();
   setBusy(false);
   setStatus(modeContent[mode].empty);
+  // show/hide save-frame based on mode and current preview state
+  if (!previewPanel.classList.contains("is-hidden") && mode !== "audio") {
+    saveFrameBar.classList.remove("is-hidden");
+  } else {
+    saveFrameBar.classList.add("is-hidden");
+  }
 }
 
 function setBusy(busy) {
@@ -729,6 +772,8 @@ function setBusy(busy) {
   cancelButton.disabled = !busy;
   modeInputs.forEach((input) => { input.disabled = busy; });
   convertButton.textContent = busy ? modeContent[getMode()].busy : modeContent[getMode()].button;
+  savePresetButton.disabled = busy;
+  saveFrameButton.disabled = busy;
 }
 
 function getFriendlyError(error, mode) {
@@ -1343,4 +1388,162 @@ function initPreviewTools(mode) {
     waveformCanvas.classList.add("is-hidden");
     trimOverlayActive = false;
   }
+}
+
+// =====================================================================
+// Sprint 1 — Event listeners
+// =====================================================================
+
+savePresetButton.addEventListener("click", toggleSavePresetInput);
+presetConfirm.addEventListener("click", confirmSavePreset);
+presetCancel.addEventListener("click", hideSavePresetInput);
+presetNameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") confirmSavePreset();
+  if (e.key === "Escape") hideSavePresetInput();
+});
+saveFrameButton.addEventListener("click", saveCurrentFrame);
+
+// =====================================================================
+// Sprint 1 — Saved presets
+// =====================================================================
+
+const PRESETS_KEY = "beetales-converter-presets-v1";
+
+function loadPresetsFromStorage() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || "[]"); } catch { return []; }
+}
+
+function savePresetsToStorage(presets) {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)); } catch { /* storage disabled */ }
+}
+
+function renderPresets() {
+  const presets = loadPresetsFromStorage();
+  presetsList.replaceChildren();
+  if (!presets.length) {
+    const hint = document.createElement("span");
+    hint.className = "presets-empty-hint";
+    hint.textContent = "No saved presets yet";
+    presetsList.appendChild(hint);
+    return;
+  }
+  presets.forEach((preset, index) => {
+    const pill = document.createElement("div");
+    pill.className = "preset-pill";
+    pill.setAttribute("role", "listitem");
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.className = "preset-apply";
+    applyBtn.textContent = preset.name;
+    applyBtn.title = `Apply preset: ${preset.name}`;
+    applyBtn.addEventListener("click", () => applyPreset(preset));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "preset-delete";
+    deleteBtn.setAttribute("aria-label", `Delete preset "${preset.name}"`);
+    deleteBtn.textContent = "×";
+    deleteBtn.addEventListener("click", () => {
+      const updated = loadPresetsFromStorage().filter((_, i) => i !== index);
+      savePresetsToStorage(updated);
+      renderPresets();
+    });
+
+    pill.append(applyBtn, deleteBtn);
+    presetsList.append(pill);
+  });
+}
+
+function toggleSavePresetInput() {
+  const hidden = savePresetInline.classList.toggle("is-hidden");
+  if (!hidden) { presetNameInput.value = ""; presetNameInput.focus(); }
+}
+
+function hideSavePresetInput() {
+  savePresetInline.classList.add("is-hidden");
+  presetNameInput.value = "";
+}
+
+function confirmSavePreset() {
+  const name = presetNameInput.value.trim();
+  if (!name) { presetNameInput.focus(); return; }
+  const preset = {
+    name,
+    mode:        getCheckedValue("mode"),
+    format:      getCheckedValue("format"),
+    bitrate:     getCheckedValue("bitrate"),
+    gifOutput:   getCheckedValue("gif-output"),
+    quality:     videoQuality.value,
+    resolution:  videoResolution.value,
+    gifWidth:    gifWidth.value,
+    gifFps:      gifFps.value,
+    speed:       videoSpeed?.value ?? "1",
+    gifSpeedVal: gifSpeed?.value ?? "1",
+    loudness:    loudnessNormalize?.checked ?? false,
+  };
+  const all = loadPresetsFromStorage();
+  const existing = all.findIndex((p) => p.name === name);
+  if (existing >= 0) all[existing] = preset; else all.push(preset);
+  savePresetsToStorage(all);
+  renderPresets();
+  hideSavePresetInput();
+  setStatus(`Preset "${name}" saved.`);
+}
+
+function applyPreset(preset) {
+  if (preset.mode)      setCheckedValue("mode", preset.mode);
+  if (preset.format)    setCheckedValue("format", preset.format);
+  if (preset.bitrate)   setCheckedValue("bitrate", preset.bitrate);
+  if (preset.gifOutput) setCheckedValue("gif-output", preset.gifOutput);
+  setSelectValue(videoQuality,  preset.quality);
+  setSelectValue(videoResolution, preset.resolution);
+  setSelectValue(gifWidth, preset.gifWidth);
+  setSelectValue(gifFps,   preset.gifFps);
+  if (videoSpeed && preset.speed)       setSelectValue(videoSpeed, preset.speed);
+  if (gifSpeed   && preset.gifSpeedVal) setSelectValue(gifSpeed,   preset.gifSpeedVal);
+  if (loudnessNormalize) loudnessNormalize.checked = !!preset.loudness;
+  updateModeUI({ resetFiles: false });
+  savePreferences();
+  setStatus(`Preset "${preset.name}" applied.`);
+}
+
+// =====================================================================
+// Sprint 1 — Save current video frame as JPEG
+// =====================================================================
+
+function saveCurrentFrame() {
+  if (!videoPreview.videoWidth || !videoPreview.videoHeight) return;
+  const canvas = document.createElement("canvas");
+  canvas.width  = videoPreview.videoWidth;
+  canvas.height = videoPreview.videoHeight;
+  canvas.getContext("2d").drawImage(videoPreview, 0, 0);
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const t    = videoPreview.currentTime;
+    const mins = String(Math.floor(t / 60)).padStart(2, "0");
+    const secs = String(Math.floor(t % 60)).padStart(2, "0");
+    const base = selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "frame";
+    const url  = URL.createObjectURL(blob);
+    forceDownload(url, `${base}-frame-${mins}m${secs}s.jpg`);
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+  }, "image/jpeg", 0.92);
+}
+
+// =====================================================================
+// Sprint 1 — Speed helpers
+// =====================================================================
+
+/**
+ * Builds a valid atempo filter chain for any speed value.
+ * ffmpeg atempo only accepts 0.5–2.0; chain multiple filters for outside values.
+ * Examples: 0.25× → "atempo=0.5,atempo=0.5"   2× → "atempo=2.0"
+ */
+function getAtempoChain(speed) {
+  const filters = [];
+  let s = speed;
+  while (s < 0.5 - 1e-9) { filters.push("atempo=0.5"); s /= 0.5; }
+  while (s > 2.0 + 1e-9) { filters.push("atempo=2.0"); s /= 2.0; }
+  filters.push(`atempo=${s.toFixed(6)}`);
+  return filters.join(",");
 }

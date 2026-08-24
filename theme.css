@@ -642,3 +642,71 @@ select:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Sprint 1 — Presets bar, Save Frame, & Loudness Toggle Theme
+   -------------------------------------------------------------------------- */
+
+.presets-bar {
+  border-color: rgba(42, 80, 48, 0.65);
+  background: var(--panel-strong);
+}
+
+.preset-pill {
+  border-color: rgba(74, 138, 40, 0.42);
+  background: rgba(74, 138, 40, 0.09);
+}
+
+.preset-pill:hover {
+  border-color: var(--accent-strong);
+  background: rgba(74, 138, 40, 0.18);
+}
+
+.preset-apply {
+  color: var(--text-strong);
+}
+
+.preset-delete {
+  border-left-color: rgba(74, 138, 40, 0.35);
+  color: var(--muted);
+}
+
+.preset-delete:hover {
+  color: var(--danger);
+}
+
+.save-preset-button {
+  border-color: rgba(74, 138, 40, 0.45);
+  color: var(--muted);
+}
+
+.save-preset-button:hover {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.08);
+}
+
+.preset-name-input {
+  border-color: rgba(74, 138, 40, 0.5);
+  background: var(--panel-soft);
+  color: var(--text-strong);
+}
+
+.preset-inline-button {
+  border-color: rgba(74, 138, 40, 0.5);
+  background: var(--panel-soft);
+}
+
+.save-frame-button {
+  border-color: rgba(74, 138, 40, 0.42);
+  background: var(--panel-strong);
+  color: var(--text-strong);
+}
+
+.save-frame-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.1);
+  color: var(--accent-strong);
+  box-shadow: 0 0 14px rgba(110, 200, 50, 0.15);
+}
+

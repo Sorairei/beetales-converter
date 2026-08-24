@@ -12,7 +12,7 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260714-structure" />
+    <link rel="stylesheet" href="style.css?v=20260823-sprint1" />
     <link rel="stylesheet" href="theme.css?v=20260823-industrial-circuit" />
   </head>
   <body>
@@ -102,6 +102,21 @@
             </div>
           </fieldset>
 
+          <!-- Saved export presets -->
+          <div class="presets-bar" id="presets-bar">
+            <div class="presets-list" id="presets-list" role="list" aria-label="Saved presets"></div>
+            <div class="presets-actions">
+              <button class="save-preset-button" id="save-preset-button" type="button" title="Save current settings as a preset">
+                <span aria-hidden="true">＋</span> Save preset
+              </button>
+              <div class="save-preset-inline is-hidden" id="save-preset-inline">
+                <input type="text" id="preset-name-input" class="preset-name-input" placeholder="Preset name…" maxlength="24" autocomplete="off" />
+                <button class="preset-inline-button preset-confirm-button" type="button" id="preset-confirm" aria-label="Save preset">✓</button>
+                <button class="preset-inline-button preset-cancel-button" type="button" id="preset-cancel" aria-label="Cancel">✕</button>
+              </div>
+            </div>
+          </div>
+
           <label class="drop-zone" for="video-file" id="drop-zone">
             <input id="video-file" name="video-file" type="file" accept="video/*,.webm" multiple />
             <span class="drop-icon" aria-hidden="true"></span>
@@ -159,6 +174,9 @@
               <button class="crop-action-button" id="crop-select-button" type="button">Select area</button>
               <button class="crop-action-button is-hidden" id="crop-reset-button" type="button">Reset crop</button>
             </div>
+            <div class="save-frame-bar is-hidden" id="save-frame-bar">
+              <button class="save-frame-button" id="save-frame-button" type="button">Save frame</button>
+            </div>
           </section>
 
           <div class="settings-grid" id="audio-settings">
@@ -197,6 +215,17 @@
                 </label>
               </div>
             </fieldset>
+            <fieldset class="settings-full">
+              <legend>Loudness</legend>
+              <label class="loudness-toggle" for="loudness-normalize">
+                <input type="checkbox" id="loudness-normalize" name="loudness-normalize" />
+                <span class="toggle-thumb" aria-hidden="true"></span>
+                <span class="loudness-label">
+                  <strong>Normalize loudness (EBU R128)</strong>
+                  <small>Streaming standard · Spotify, YouTube, Netflix</small>
+                </span>
+              </label>
+            </fieldset>
           </div>
 
           <div class="settings-grid mp4-settings is-hidden" id="mp4-settings">
@@ -215,6 +244,17 @@
                 <option value="1080">1080p</option>
                 <option value="720">720p</option>
                 <option value="480">480p</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Speed</legend>
+              <select class="setting-select" id="video-speed" name="video-speed">
+                <option value="0.25">0.25× · Super slow</option>
+                <option value="0.5">0.5× · Slow motion</option>
+                <option value="0.75">0.75× · Slight slow</option>
+                <option value="1" selected>1× · Normal</option>
+                <option value="1.5">1.5× · Quick</option>
+                <option value="2">2× · Fast forward</option>
               </select>
             </fieldset>
           </div>
@@ -266,6 +306,16 @@
                 <option value="8">8 FPS · smaller</option>
                 <option value="12" selected>12 FPS · balanced</option>
                 <option value="15">15 FPS · smoother</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Speed</legend>
+              <select class="setting-select" id="gif-speed" name="gif-speed">
+                <option value="0.5">0.5× · Slow motion</option>
+                <option value="0.75">0.75× · Slight slow</option>
+                <option value="1" selected>1× · Normal</option>
+                <option value="1.5">1.5× · Quick</option>
+                <option value="2">2× · Fast</option>
               </select>
             </fieldset>
           </div>

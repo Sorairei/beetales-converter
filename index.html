@@ -12,8 +12,8 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-sprint1" />
-    <link rel="stylesheet" href="theme.css?v=20260823-industrial-circuit" />
+    <link rel="stylesheet" href="style.css?v=20260823-sprint2" />
+    <link rel="stylesheet" href="theme.css?v=20260823-sprint2" />
   </head>
   <body>
     <main class="app-shell">
@@ -106,6 +106,9 @@
           <div class="presets-bar" id="presets-bar">
             <div class="presets-list" id="presets-list" role="list" aria-label="Saved presets"></div>
             <div class="presets-actions">
+              <button class="save-preset-button share-config-button" id="share-config-button" type="button" title="Copy shareable link with current configuration">
+                <span aria-hidden="true">🔗</span> <span id="share-config-text">Share link</span>
+              </button>
               <button class="save-preset-button" id="save-preset-button" type="button" title="Save current settings as a preset">
                 <span aria-hidden="true">＋</span> Save preset
               </button>
@@ -255,6 +258,24 @@
                 <option value="1" selected>1× · Normal</option>
                 <option value="1.5">1.5× · Quick</option>
                 <option value="2">2× · Fast forward</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Audio track</legend>
+              <select class="setting-select" id="mp4-audio-track" name="mp4-audio-track">
+                <option value="stereo" selected>Original · Stereo</option>
+                <option value="mono">Mono · Compact</option>
+                <option value="mute">Mute · No audio</option>
+              </select>
+            </fieldset>
+            <fieldset>
+              <legend>Color & style</legend>
+              <select class="setting-select" id="mp4-color-filter" name="mp4-color-filter">
+                <option value="none" selected>Original · None</option>
+                <option value="vivid">Vivid · Punchy</option>
+                <option value="contrast">High contrast</option>
+                <option value="bw">Black & White</option>
+                <option value="warm">Cinematic warm</option>
               </select>
             </fieldset>
           </div>

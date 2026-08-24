@@ -710,3 +710,32 @@ select:focus-visible {
   box-shadow: 0 0 14px rgba(110, 200, 50, 0.15);
 }
 
+/* --------------------------------------------------------------------------
+   Sprint 2 — Share config & Drag/Drop queue Theme
+   -------------------------------------------------------------------------- */
+
+.share-config-button {
+  border-color: rgba(74, 138, 40, 0.45);
+  color: var(--muted);
+}
+
+.share-config-button:hover {
+  border-color: var(--amber-strong);
+  color: var(--amber-strong);
+  background: rgba(245, 166, 35, 0.08);
+}
+
+.share-config-button.is-copied {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.18);
+  box-shadow: 0 0 12px rgba(110, 200, 50, 0.28);
+}
+
+.file-list li.drag-over {
+  border-top-color: var(--amber-strong);
+  background: rgba(245, 166, 35, 0.15);
+  box-shadow: 0 -4px 14px rgba(245, 166, 35, 0.25);
+}
+
+

@@ -48,7 +48,7 @@ const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed, #mp4-audio-track, #mp4-color-filter');
 
 const cropContainer = $("#crop-container");
 const cropOverlay = $("#crop-overlay");
@@ -70,7 +70,7 @@ const waveformCanvas = $("#waveform-canvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const waveformCtx = waveformCanvas.getContext("2d");
 
-// Sprint 1 new feature DOM refs
+// Sprint 1 & 2 new feature DOM refs
 const saveFrameBar = $("#save-frame-bar");
 const saveFrameButton = $("#save-frame-button");
 const presetsList = $("#presets-list");
@@ -82,6 +82,9 @@ const presetCancel = $("#preset-cancel");
 const loudnessNormalize = $("#loudness-normalize");
 const videoSpeed = $("#video-speed");
 const gifSpeed = $("#gif-speed");
+const shareConfigButton = $("#share-config-button");
+const mp4AudioTrack = $("#mp4-audio-track");
+const mp4ColorFilter = $("#mp4-color-filter");
 
 const FRAME_STEP = 1 / 30;
 const TIMELINE_THUMBNAILS = 12;
@@ -194,6 +197,7 @@ videoPreview.addEventListener("timeupdate", () => {
   if (waveformReady) drawWaveform();
 });
 restorePreferences();
+applyUrlParams();
 updateModeUI({ resetFiles: false });
 renderPresets();
 
@@ -236,6 +240,8 @@ async function handleFiles(fileCollection) {
   if (currentMode === "audio" && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
 }
 
+let draggedIndex = null;
+
 function renderQueue() {
   fileList.replaceChildren();
   fileCard.classList.toggle("is-hidden", selectedFiles.length === 0);
@@ -244,15 +250,25 @@ function renderQueue() {
   fileSize.textContent = `${formatBytes(selectedFiles.reduce((total, file) => total + file.size, 0))} total`;
   selectedFiles.forEach((file, index) => {
     const item = document.createElement("li");
+    item.draggable = !conversionInProgress;
+    item.dataset.index = String(index);
+
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.setAttribute("aria-hidden", "true");
+    handle.title = "Drag to reorder queue";
+    handle.textContent = "⋮⋮";
+
     const details = document.createElement("span");
     const name = document.createElement("strong");
     const size = document.createElement("small");
     const state = document.createElement("em");
-    const remove = document.createElement("button");
     name.textContent = file.name;
     size.textContent = formatBytes(file.size);
     state.innerHTML = fileStates.get(file) || formatMediaMetadata(fileMetadata.get(file));
     details.append(name, size, state);
+
+    const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "Remove";
     remove.disabled = conversionInProgress;
@@ -266,7 +282,44 @@ function renderQueue() {
       showPreview(selectedFiles[0]);
       setStatus(selectedFiles.length ? `${selectedFiles.length} ${modeContent[getMode()].ready}` : modeContent[getMode()].empty);
     });
-    item.append(details, remove);
+
+    item.addEventListener("dragstart", (e) => {
+      if (conversionInProgress) return;
+      draggedIndex = index;
+      item.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(index));
+    });
+
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (draggedIndex === null || draggedIndex === index) return;
+      item.classList.add("drag-over");
+      e.dataTransfer.dropEffect = "move";
+    });
+
+    item.addEventListener("dragleave", () => {
+      item.classList.remove("drag-over");
+    });
+
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      item.classList.remove("drag-over");
+      if (draggedIndex === null || draggedIndex === index) return;
+      const movedItem = selectedFiles.splice(draggedIndex, 1)[0];
+      selectedFiles.splice(index, 0, movedItem);
+      draggedIndex = null;
+      renderQueue();
+      showPreview(selectedFiles[0]);
+    });
+
+    item.addEventListener("dragend", () => {
+      item.classList.remove("is-dragging");
+      item.classList.remove("drag-over");
+      draggedIndex = null;
+    });
+
+    item.append(handle, details, remove);
     fileList.append(item);
   });
 }
@@ -577,9 +630,53 @@ function getMp4Args(inputName, outputName, encoder, trim) {
   const videoFilters = [];
   if (speedVal !== 1) videoFilters.push(`setpts=PTS/${speedVal}`);
   if (videoResolution.value !== "original") videoFilters.push(`scale=w=-2:h=${videoResolution.value}:force_original_aspect_ratio=decrease`);
+
+  const colorVal = mp4ColorFilter?.value || "none";
+  if (colorVal === "vivid") {
+    videoFilters.push("eq=saturation=1.35:contrast=1.08");
+  } else if (colorVal === "contrast") {
+    videoFilters.push("eq=contrast=1.25:brightness=-0.02");
+  } else if (colorVal === "bw") {
+    videoFilters.push("hue=s=0");
+  } else if (colorVal === "warm") {
+    videoFilters.push("colorbalance=rs=0.08:gs=0.02:bs=-0.08");
+  }
+
   const vfArgs = videoFilters.length ? ["-vf", videoFilters.join(",")] : [];
-  const audioSpeedArgs = speedVal !== 1 ? ["-af", getAtempoChain(speedVal)] : [];
-  return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), "-map", "0:v:0", "-map", "0:a:0?", ...videoArgs, ...vfArgs, ...audioSpeedArgs, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", outputName];
+
+  const audioTrackVal = mp4AudioTrack?.value || "stereo";
+  let audioMappingAndCodec = [];
+
+  if (audioTrackVal === "mute") {
+    audioMappingAndCodec = ["-an"];
+  } else {
+    const audioFilters = [];
+    if (speedVal !== 1) audioFilters.push(getAtempoChain(speedVal));
+    const afArgs = audioFilters.length ? ["-af", audioFilters.join(",")] : [];
+    const channelArgs = audioTrackVal === "mono" ? ["-ac", "1"] : [];
+    audioMappingAndCodec = ["-map", "0:a:0?", ...afArgs, "-c:a", "aac", ...channelArgs, "-b:a", "160k"];
+  }
+
+  return [
+    "-hide_banner",
+    "-y",
+    ...getTrimInputArgs(trim),
+    "-i",
+    inputName,
+    ...getTrimDurationArgs(trim),
+    "-map",
+    "0:v:0",
+    ...videoArgs,
+    ...vfArgs,
+    ...audioMappingAndCodec,
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "-f",
+    "mp4",
+    outputName,
+  ];
 }
 
 function getGifArgs(inputName, outputName, trim) {
@@ -668,6 +765,8 @@ function savePreferences() {
     speed: videoSpeed?.value ?? "1",
     gifSpeedVal: gifSpeed?.value ?? "1",
     loudness: loudnessNormalize?.checked ?? false,
+    mp4Audio: mp4AudioTrack?.value ?? "stereo",
+    mp4Filter: mp4ColorFilter?.value ?? "none",
   };
   try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
 }
@@ -687,6 +786,8 @@ function restorePreferences() {
     if (videoSpeed && preferences.speed) setSelectValue(videoSpeed, preferences.speed);
     if (gifSpeed && preferences.gifSpeedVal) setSelectValue(gifSpeed, preferences.gifSpeedVal);
     if (loudnessNormalize && preferences.loudness !== undefined) loudnessNormalize.checked = !!preferences.loudness;
+    if (mp4AudioTrack && preferences.mp4Audio) setSelectValue(mp4AudioTrack, preferences.mp4Audio);
+    if (mp4ColorFilter && preferences.mp4Filter) setSelectValue(mp4ColorFilter, preferences.mp4Filter);
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
@@ -703,6 +804,8 @@ function restoreAllDefaults() {
   if (videoSpeed) videoSpeed.value = "1";
   if (gifSpeed) gifSpeed.value = "1";
   if (loudnessNormalize) loudnessNormalize.checked = false;
+  if (mp4AudioTrack) mp4AudioTrack.value = "stereo";
+  if (mp4ColorFilter) mp4ColorFilter.value = "none";
   trimStart.value = "";
   trimEnd.value = "";
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
@@ -773,6 +876,7 @@ function setBusy(busy) {
   modeInputs.forEach((input) => { input.disabled = busy; });
   convertButton.textContent = busy ? modeContent[getMode()].busy : modeContent[getMode()].button;
   savePresetButton.disabled = busy;
+  if (shareConfigButton) shareConfigButton.disabled = busy;
   saveFrameButton.disabled = busy;
 }
 
@@ -1391,7 +1495,7 @@ function initPreviewTools(mode) {
 }
 
 // =====================================================================
-// Sprint 1 — Event listeners
+// Sprint 1 & 2 — Event listeners
 // =====================================================================
 
 savePresetButton.addEventListener("click", toggleSavePresetInput);
@@ -1402,9 +1506,10 @@ presetNameInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") hideSavePresetInput();
 });
 saveFrameButton.addEventListener("click", saveCurrentFrame);
+if (shareConfigButton) shareConfigButton.addEventListener("click", handleShareConfig);
 
 // =====================================================================
-// Sprint 1 — Saved presets
+// Sprint 1 & 2 — Saved presets
 // =====================================================================
 
 const PRESETS_KEY = "beetales-converter-presets-v1";
@@ -1481,6 +1586,8 @@ function confirmSavePreset() {
     speed:       videoSpeed?.value ?? "1",
     gifSpeedVal: gifSpeed?.value ?? "1",
     loudness:    loudnessNormalize?.checked ?? false,
+    mp4Audio:    mp4AudioTrack?.value ?? "stereo",
+    mp4Filter:   mp4ColorFilter?.value ?? "none",
   };
   const all = loadPresetsFromStorage();
   const existing = all.findIndex((p) => p.name === name);
@@ -1500,12 +1607,100 @@ function applyPreset(preset) {
   setSelectValue(videoResolution, preset.resolution);
   setSelectValue(gifWidth, preset.gifWidth);
   setSelectValue(gifFps,   preset.gifFps);
-  if (videoSpeed && preset.speed)       setSelectValue(videoSpeed, preset.speed);
-  if (gifSpeed   && preset.gifSpeedVal) setSelectValue(gifSpeed,   preset.gifSpeedVal);
+  if (videoSpeed && preset.speed)             setSelectValue(videoSpeed, preset.speed);
+  if (gifSpeed   && preset.gifSpeedVal)       setSelectValue(gifSpeed,   preset.gifSpeedVal);
   if (loudnessNormalize) loudnessNormalize.checked = !!preset.loudness;
+  if (mp4AudioTrack && preset.mp4Audio)       setSelectValue(mp4AudioTrack, preset.mp4Audio);
+  if (mp4ColorFilter && preset.mp4Filter)     setSelectValue(mp4ColorFilter, preset.mp4Filter);
   updateModeUI({ resetFiles: false });
   savePreferences();
   setStatus(`Preset "${preset.name}" applied.`);
+}
+
+// =====================================================================
+// Sprint 2 — Share URL generation & parsing
+// =====================================================================
+
+function generateShareUrl() {
+  const params = new URLSearchParams();
+  const mode = getMode();
+  params.set("mode", mode);
+  if (mode === "audio") {
+    params.set("format", getCheckedValue("format"));
+    params.set("bitrate", getCheckedValue("bitrate"));
+    if (loudnessNormalize?.checked) params.set("loudness", "1");
+  } else if (mode === "mp4") {
+    params.set("quality", videoQuality.value);
+    params.set("res", videoResolution.value);
+    if (videoSpeed?.value && videoSpeed.value !== "1") params.set("speed", videoSpeed.value);
+    if (mp4AudioTrack?.value && mp4AudioTrack.value !== "stereo") params.set("audio", mp4AudioTrack.value);
+    if (mp4ColorFilter?.value && mp4ColorFilter.value !== "none") params.set("filter", mp4ColorFilter.value);
+  } else if (mode === "gif") {
+    params.set("gif_out", getCheckedValue("gif-output"));
+    params.set("width", gifWidth.value);
+    params.set("fps", gifFps.value);
+    if (gifSpeed?.value && gifSpeed.value !== "1") params.set("speed", gifSpeed.value);
+  }
+  const url = new URL(window.location.href);
+  url.search = params.toString();
+  return url.toString();
+}
+
+async function handleShareConfig() {
+  const shareUrl = generateShareUrl();
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+    } else {
+      const input = document.createElement("input");
+      input.value = shareUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    const textSpan = document.getElementById("share-config-text");
+    if (textSpan) textSpan.textContent = "Link copied!";
+    if (shareConfigButton) shareConfigButton.classList.add("is-copied");
+    setStatus("Configuration link copied to clipboard.");
+    setTimeout(() => {
+      if (textSpan) textSpan.textContent = "Share link";
+      if (shareConfigButton) shareConfigButton.classList.remove("is-copied");
+    }, 2500);
+  } catch {
+    prompt("Copy this configuration link:", shareUrl);
+  }
+}
+
+function applyUrlParams() {
+  const search = window.location.search;
+  if (!search) return;
+  try {
+    const params = new URLSearchParams(search);
+    const mode = params.get("mode");
+    if (mode && ["audio", "mp4", "gif"].includes(mode)) {
+      setCheckedValue("mode", mode);
+    }
+    if (params.has("format")) setCheckedValue("format", params.get("format"));
+    if (params.has("bitrate")) setCheckedValue("bitrate", params.get("bitrate"));
+    if (params.has("loudness") && loudnessNormalize) loudnessNormalize.checked = params.get("loudness") === "1";
+    if (params.has("quality")) setSelectValue(videoQuality, params.get("quality"));
+    if (params.has("res")) setSelectValue(videoResolution, params.get("res"));
+    if (params.has("speed")) {
+      if (videoSpeed) setSelectValue(videoSpeed, params.get("speed"));
+      if (gifSpeed) setSelectValue(gifSpeed, params.get("speed"));
+    }
+    if (params.has("audio") && mp4AudioTrack) setSelectValue(mp4AudioTrack, params.get("audio"));
+    if (params.has("filter") && mp4ColorFilter) setSelectValue(mp4ColorFilter, params.get("filter"));
+    if (params.has("gif_out")) setCheckedValue("gif-output", params.get("gif_out"));
+    if (params.has("width")) setSelectValue(gifWidth, params.get("width"));
+    if (params.has("fps")) setSelectValue(gifFps, params.get("fps"));
+
+    savePreferences();
+    setStatus("Configuration loaded from URL link.");
+  } catch {
+    /* ignore malformed url params */
+  }
 }
 
 // =====================================================================

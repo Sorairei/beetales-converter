@@ -12,8 +12,8 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-sprint4-i18n" />
-    <link rel="stylesheet" href="theme.css?v=20260823-sprint4-i18n" />
+    <link rel="stylesheet" href="style.css?v=20260823-sprint4-fix" />
+    <link rel="stylesheet" href="theme.css?v=20260823-sprint4-fix" />
   </head>
   <body>
     <main class="app-shell">
@@ -54,7 +54,7 @@
           <!-- Language Selector & User Guide Bar -->
           <div class="user-utilities-bar">
             <div class="language-picker">
-              <span class="lang-icon" aria-hidden="true">🌐</span>
+              <span class="lang-icon" aria-hidden="true">&#9672;</span>
               <label for="language-select" class="sr-only">Language</label>
               <select id="language-select" class="language-select" aria-label="Language selector">
                 <option value="en" selected>English (EN)</option>
@@ -64,7 +64,7 @@
               </select>
             </div>
             <button class="guide-toggle-button" id="guide-toggle" type="button" aria-haspopup="dialog">
-              <span aria-hidden="true">📖</span>
+              <span aria-hidden="true">&#8505;</span>
               <span data-i18n="nav_user_guide">User Guide & Help</span>
             </button>
           </div>
@@ -302,7 +302,7 @@
               <div class="aux-files-grid">
                 <div class="aux-file-box">
                   <label class="aux-file-button" for="subtitles-file" id="subtitles-label">
-                    <span aria-hidden="true">📄</span>
+                    <span aria-hidden="true">&#43;</span>
                     <span>Burn subtitles (.srt)</span>
                     <input id="subtitles-file" name="subtitles-file" type="file" accept=".srt,.vtt" />
                   </label>
@@ -313,7 +313,7 @@
                 </div>
                 <div class="aux-file-box">
                   <label class="aux-file-button" for="external-audio-file" id="external-audio-label">
-                    <span aria-hidden="true">🎵</span>
+                    <span aria-hidden="true">&#43;</span>
                     <span>Replace audio track</span>
                     <input id="external-audio-file" name="external-audio-file" type="file" accept="audio/*,.mp3,.wav,.aac,.m4a,.ogg" />
                   </label>
@@ -434,7 +434,7 @@
 
     <div class="floating-controls">
       <button class="history-floating-button" id="history-toggle" type="button" aria-label="View conversion history and savings" title="View conversion history and savings">
-        <span aria-hidden="true">📊</span>
+        <span aria-hidden="true">&#8801;</span>
         <span class="history-badge" id="history-badge">History</span>
       </button>
 
@@ -477,11 +477,11 @@
         </div>
 
         <div class="guide-nav-tabs" role="tablist" aria-label="Guide topics">
-          <button class="guide-tab-button is-active" data-tab="overview" type="button" role="tab" aria-selected="true" data-i18n="guide_tab_overview">🌟 Overview</button>
-          <button class="guide-tab-button" data-tab="modes" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_modes">🎬 Formats & Modes</button>
-          <button class="guide-tab-button" data-tab="audio" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_audio">🔊 Audio & Loudness</button>
-          <button class="guide-tab-button" data-tab="video" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_video">⚡ Video & Subtitles</button>
-          <button class="guide-tab-button" data-tab="privacy" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_privacy">🛡️ 100% Local Privacy</button>
+          <button class="guide-tab-button is-active" data-tab="overview" type="button" role="tab" aria-selected="true" data-i18n="guide_tab_overview">Overview</button>
+          <button class="guide-tab-button" data-tab="modes" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_modes">Formats & Modes</button>
+          <button class="guide-tab-button" data-tab="audio" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_audio">Audio & Loudness</button>
+          <button class="guide-tab-button" data-tab="video" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_video">Video & Subtitles</button>
+          <button class="guide-tab-button" data-tab="privacy" type="button" role="tab" aria-selected="false" data-i18n="guide_tab_privacy">Local Privacy</button>
         </div>
 
         <div class="guide-content-body">
@@ -491,17 +491,17 @@
             <p data-i18n="guide_sec_intro_p">BeeTales is an open-source, local-first media workstation that converts video and audio directly inside your web browser. Powered by WebAssembly (FFmpeg), your files never leave your computer—no servers, no document uploads, and no subscription fees.</p>
             <div class="guide-quick-cards">
               <div class="guide-card">
-                <h4>🚀 Quick Workflow</h4>
+                <h4 data-i18n="guide_card_workflow_title">Quick Workflow</h4>
                 <ol>
-                  <li>Choose your <strong>Conversion Mode</strong> (Audio, MP4, or GIF).</li>
-                  <li>Drag and drop your video files into the dropzone.</li>
-                  <li>Customize settings (Quality, Loudness, Speed, Subtitles).</li>
-                  <li>Click <strong>Convert</strong> and download your files.</li>
+                  <li data-i18n="guide_card_workflow_step1">1. Choose your Conversion Mode (Audio, MP4, or GIF).</li>
+                  <li data-i18n="guide_card_workflow_step2">2. Drag and drop your video files into the dropzone.</li>
+                  <li data-i18n="guide_card_workflow_step3">3. Customize settings (Quality, Loudness, Speed, Subtitles).</li>
+                  <li data-i18n="guide_card_workflow_step4">4. Click Convert and download your files.</li>
                 </ol>
               </div>
               <div class="guide-card">
-                <h4>🎛️ Saved Presets & Share Links</h4>
-                <p>Save your favorite configuration with the <strong>Save preset</strong> button or click <strong>Share link</strong> to copy a direct URL containing your active settings.</p>
+                <h4 data-i18n="guide_card_presets_title">Saved Presets & Share Links</h4>
+                <p data-i18n="guide_card_presets_desc">Save your favorite configuration with the Save preset button or click Share link to copy a direct URL containing your active settings.</p>
               </div>
             </div>
           </div>
@@ -519,7 +519,7 @@
             </div>
             <div class="guide-item-block">
               <h4 data-i18n="mode_gif_title">Video to GIF</h4>
-              <p data-i18n="guide_sec_modes_gif">• Video to GIF / WebP: Generates ultra-smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.</p>
+              <p data-i18n="guide_sec_modes_gif">• Video to GIF / WebP: Generates smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.</p>
             </div>
           </div>
 
@@ -528,10 +528,10 @@
             <h3 data-i18n="guide_sec_loudness_h3">EBU R128 Loudness Normalization</h3>
             <p data-i18n="guide_sec_loudness_p">EBU R128 (Loudness Normalization) is the broadcast and streaming standard used by Spotify, YouTube, Apple Music, and Netflix. When enabled, it balances the volume across different clips, preventing quiet audio or sudden jarring loud peaks without introducing distortion.</p>
             <div class="guide-card">
-              <h4>🎯 Recommended Uses</h4>
+              <h4 data-i18n="guide_card_uses_title">Recommended Uses</h4>
               <ul>
-                <li><strong>Podcasts & Voice Notes</strong>: Ensures speech is clearly intelligible.</li>
-                <li><strong>Music & Video Soundtracks</strong>: Levels sound for comfortable listening without manual volume adjustments.</li>
+                <li data-i18n="guide_card_uses_podcasts">• Podcasts & Voice Notes: Ensures speech is clearly intelligible.</li>
+                <li data-i18n="guide_card_uses_music">• Music & Soundtracks: Levels sound for comfortable listening without manual adjustments.</li>
               </ul>
             </div>
           </div>
@@ -553,17 +553,17 @@
             <h3 data-i18n="guide_sec_privacy_h3">How Local Privacy Works</h3>
             <p data-i18n="guide_sec_privacy_p">Unlike typical online converters that upload your confidential video clips to remote cloud servers, BeeTales executes a compiled C/C++ FFmpeg engine inside a WebAssembly sandbox in your browser. All computations happen in local RAM, making it safe for private footage, copyrighted materials, and offline work.</p>
             <div class="guide-card">
-              <h4>🔒 Security Guarantees</h4>
+              <h4 data-i18n="guide_card_security_title">Security Guarantees</h4>
               <ul>
-                <li><strong>Zero Telemetry on Files</strong>: No files or filenames are ever transmitted to any third-party server.</li>
-                <li><strong>Works Offline</strong>: Once loaded, conversions continue to function even without an active internet connection.</li>
+                <li data-i18n="guide_card_security_item1">• Zero Telemetry on Files: No files or filenames are ever transmitted to any third-party server.</li>
+                <li data-i18n="guide_card_security_item2">• Works Offline: Once loaded, conversions continue to function even without an active internet connection.</li>
               </ul>
             </div>
           </div>
         </div>
 
         <div class="guide-footer">
-          <button class="guide-close-primary" id="guide-close-btn" type="button">Got it!</button>
+          <button class="guide-close-primary" id="guide-close-btn" type="button" data-i18n="guide_close_btn_label">Close</button>
         </div>
       </div>
     </div>

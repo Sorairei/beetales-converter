@@ -2046,6 +2046,13 @@ if (guideClose) guideClose.addEventListener("click", closeGuideModal);
 if (guideCloseBtn) guideCloseBtn.addEventListener("click", closeGuideModal);
 if (guideBackdrop) guideBackdrop.addEventListener("click", closeGuideModal);
 
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeGuideModal();
+    closeHistoryModal();
+  }
+});
+
 guideTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     guideTabs.forEach((t) => {

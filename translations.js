@@ -109,22 +109,35 @@ export const translations = {
     // Guide Modal
     guide_title: "BeeTales Converter — User Guide & Manual",
     guide_subtitle: "Everything you need to know about all features and tools",
-    guide_tab_overview: "🌟 Overview",
-    guide_tab_modes: "🎬 Formats & Modes",
-    guide_tab_audio: "🔊 Audio & Loudness",
-    guide_tab_video: "⚡ Video & Subtitles",
-    guide_tab_privacy: "🛡️ 100% Local Privacy",
+    guide_tab_overview: "Overview",
+    guide_tab_modes: "Formats & Modes",
+    guide_tab_audio: "Audio & Loudness",
+    guide_tab_video: "Video & Subtitles",
+    guide_tab_privacy: "Local Privacy",
 
     guide_sec_intro_title: "Welcome to BeeTales Media Converter",
     guide_sec_intro_p: "BeeTales is an open-source, local-first media workstation that converts video and audio directly inside your web browser. Powered by WebAssembly (FFmpeg), your files never leave your computer—no servers, no document uploads, and no subscription fees.",
 
+    guide_card_workflow_title: "Quick Workflow",
+    guide_card_workflow_step1: "1. Choose your Conversion Mode (Audio, MP4, or GIF).",
+    guide_card_workflow_step2: "2. Drag and drop your video files into the dropzone.",
+    guide_card_workflow_step3: "3. Customize settings (Quality, Loudness, Speed, Subtitles).",
+    guide_card_workflow_step4: "4. Click Convert and download your files.",
+
+    guide_card_presets_title: "Saved Presets & Share Links",
+    guide_card_presets_desc: "Save your favorite configuration with the Save preset button or click Share link to copy a direct URL containing your active settings.",
+
     guide_sec_modes_h3: "Conversion Modes Explained",
     guide_sec_modes_audio: "• Extract Audio (MP3 / WAV / AAC): Extracts the sound track from video clips at customizable bitrates (128k, 192k, 320k) or uncompressed WAV.",
     guide_sec_modes_mp4: "• Convert & Optimize MP4: Re-encodes WebM and video files to universal MP4 (H.264 / AAC) with customizable quality (CRF), resolution scaling (1080p, 720p, 480p), and speed.",
-    guide_sec_modes_gif: "• Video to GIF / WebP: Generates ultra-smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.",
+    guide_sec_modes_gif: "• Video to GIF / WebP: Generates smooth animated GIFs or modern animated WebP files with two-pass palette optimization and interactive visual cropping.",
 
     guide_sec_loudness_h3: "EBU R128 Loudness Normalization",
     guide_sec_loudness_p: "EBU R128 (Loudness Normalization) is the broadcast and streaming standard used by Spotify, YouTube, Apple Music, and Netflix. When enabled, it balances the volume across different clips, preventing quiet audio or sudden jarring loud peaks without introducing distortion.",
+
+    guide_card_uses_title: "Recommended Uses",
+    guide_card_uses_podcasts: "• Podcasts & Voice Notes: Ensures speech is clearly intelligible.",
+    guide_card_uses_music: "• Music & Soundtracks: Levels sound for comfortable listening without manual adjustments.",
 
     guide_sec_features_h3: "Advanced Video Tools",
     guide_sec_speed: "• Speed Control: Slow down video (0.25×, 0.5×, 0.75×) or speed it up (1.5×, 2×) with automatic audio pitch and tempo synchronization.",
@@ -134,7 +147,13 @@ export const translations = {
     guide_sec_save_frame: "• Save Frame (JPEG): Instantly snapshot the current frame at full resolution without waiting for video processing.",
 
     guide_sec_privacy_h3: "How Local Privacy Works",
-    guide_sec_privacy_p: "Unlike typical online converters that upload your confidential video clips to remote cloud servers, BeeTales executes a compiled C/C++ FFmpeg engine inside a WebAssembly sandbox in your browser. All computations happen in local RAM, making it safe for private footage, copyrighted materials, and offline work."
+    guide_sec_privacy_p: "Unlike typical online converters that upload your confidential video clips to remote cloud servers, BeeTales executes a compiled C/C++ FFmpeg engine inside a WebAssembly sandbox in your browser. All computations happen in local RAM, making it safe for private footage, copyrighted materials, and offline work.",
+
+    guide_card_security_title: "Security Guarantees",
+    guide_card_security_item1: "• Zero Telemetry on Files: No files or filenames are ever transmitted to any third-party server.",
+    guide_card_security_item2: "• Works Offline: Once loaded, conversions continue to function even without an active internet connection.",
+
+    guide_close_btn_label: "Close"
   },
 
   es: {
@@ -247,14 +266,23 @@ export const translations = {
     // Guide Modal
     guide_title: "Convertidor BeeTales — Guía de Usuario y Manual",
     guide_subtitle: "Todo lo que necesitas saber sobre cada herramienta y función",
-    guide_tab_overview: "🌟 Resumen",
-    guide_tab_modes: "🎬 Formatos y Modos",
-    guide_tab_audio: "🔊 Audio y Loudness",
-    guide_tab_video: "⚡ Video y Subtítulos",
-    guide_tab_privacy: "🛡️ Privacidad 100% Local",
+    guide_tab_overview: "Resumen",
+    guide_tab_modes: "Formatos y Modos",
+    guide_tab_audio: "Audio y Loudness",
+    guide_tab_video: "Video y Subtítulos",
+    guide_tab_privacy: "Privacidad Local",
 
     guide_sec_intro_title: "Bienvenido a BeeTales Media Converter",
     guide_sec_intro_p: "BeeTales es una estación de trabajo multimedia de código abierto que procesa video y audio directamente dentro de tu navegador web. Gracias a WebAssembly (FFmpeg), tus archivos nunca salen de tu ordenador: sin servidores, sin subir documentos y sin límites de pago.",
+
+    guide_card_workflow_title: "Flujo de Trabajo Rápido",
+    guide_card_workflow_step1: "1. Elige tu Modo de Conversión (Audio, MP4 o GIF).",
+    guide_card_workflow_step2: "2. Arrastra y suelta tus videos en el área de selección.",
+    guide_card_workflow_step3: "3. Personaliza ajustes (Calidad, Volumen, Velocidad, Subtítulos).",
+    guide_card_workflow_step4: "4. Haz clic en Convertir y descarga tus archivos.",
+
+    guide_card_presets_title: "Presets Guardados y Enlaces Compartibles",
+    guide_card_presets_desc: "Guarda tu configuración favorita con el botón Guardar preset o haz clic en Compartir enlace para copiar una URL directa con tus ajustes.",
 
     guide_sec_modes_h3: "Modos de Conversión Explicados",
     guide_sec_modes_audio: "• Extraer Audio (MP3 / WAV / AAC): Extrae la pista de sonido de tus videos con bitrates personalizables (128k, 192k, 320k) o formato WAV sin compresión.",
@@ -264,6 +292,10 @@ export const translations = {
     guide_sec_loudness_h3: "Normalización de Volumen EBU R128",
     guide_sec_loudness_p: "EBU R128 es el estándar internacional de sonoridad usado por Spotify, YouTube, Apple Music y Netflix. Al activarlo, equilibra el volumen de tus pistas de audio para que no suenen ni muy bajas ni con picos molestos de saturación.",
 
+    guide_card_uses_title: "Usos Recomendados",
+    guide_card_uses_podcasts: "• Podcasts y Notas de Voz: Asegura que la voz sea perfectamente inteligible.",
+    guide_card_uses_music: "• Música y Bandas Sonoras: Nivel óptimo para escuchar sin saltos bruscos de volumen.",
+
     guide_sec_features_h3: "Herramientas Avanzadas de Video",
     guide_sec_speed: "• Control de Velocidad: Ralentiza videos (0.25×, 0.5×, 0.75×) o aceléralos (1.5×, 2×) manteniendo sincronizados el tono y tiempo del audio.",
     guide_sec_subs: "• Incrustar Subtítulos (.srt / .vtt): Quema subtítulos directamente sobre el video con contorno nítido y alta legibilidad.",
@@ -272,7 +304,13 @@ export const translations = {
     guide_sec_save_frame: "• Guardar Frame (JPEG): Captura una imagen exacta del fotograma actual en resolución completa sin demoras.",
 
     guide_sec_privacy_h3: "Cómo Funciona la Privacidad Local",
-    guide_sec_privacy_p: "A diferencia de convertidores web tradicionales que suben tus videos confidenciales a servidores en la nube, BeeTales ejecuta el motor nativo de FFmpeg compilado en WebAssembly en tu propio navegador. Todo el procesamiento ocurre en la memoria RAM local, siendo seguro para videos privados y uso sin conexión."
+    guide_sec_privacy_p: "A diferencia de convertidores web tradicionales que suben tus videos confidenciales a servidores en la nube, BeeTales ejecuta el motor nativo de FFmpeg compilado en WebAssembly en tu propio navegador. Todo el procesamiento ocurre en la memoria RAM local, siendo seguro para videos privados y uso sin conexión.",
+
+    guide_card_security_title: "Garantías de Seguridad",
+    guide_card_security_item1: "• Cero Telemetría en Archivos: Ningún archivo ni nombre sale jamás hacia servidores de terceros.",
+    guide_card_security_item2: "• Funciona Sin Conexión: Una vez cargada la página, las conversiones funcionan incluso sin internet.",
+
+    guide_close_btn_label: "Cerrar"
   },
 
   pt: {
@@ -385,14 +423,23 @@ export const translations = {
     // Guide Modal
     guide_title: "Conversor BeeTales — Guia do Usuário e Manual",
     guide_subtitle: "Tudo o que você precisa saber sobre cada recurso e ferramenta",
-    guide_tab_overview: "🌟 Visão Geral",
-    guide_tab_modes: "🎬 Formatos e Modos",
-    guide_tab_audio: "🔊 Áudio e Loudness",
-    guide_tab_video: "⚡ Vídeo e Legendas",
-    guide_tab_privacy: "🛡️ Privacidade 100% Local",
+    guide_tab_overview: "Visão Geral",
+    guide_tab_modes: "Formatos e Modos",
+    guide_tab_audio: "Áudio e Loudness",
+    guide_tab_video: "Vídeo e Legendas",
+    guide_tab_privacy: "Privacidade Local",
 
     guide_sec_intro_title: "Bem-vindo ao BeeTales Media Converter",
     guide_sec_intro_p: "O BeeTales é uma estação de trabalho multimídia de código aberto que processa vídeo e áudio diretamente no seu navegador. Com o WebAssembly (FFmpeg), seus arquivos nunca saem do seu computador.",
+
+    guide_card_workflow_title: "Fluxo de Trabalho Rápido",
+    guide_card_workflow_step1: "1. Escolha o seu Modo de Conversão (Áudio, MP4 ou GIF).",
+    guide_card_workflow_step2: "2. Arraste e solte seus vídeos na área de seleção.",
+    guide_card_workflow_step3: "3. Personalize ajustes (Qualidade, Volume, Velocidade, Legendas).",
+    guide_card_workflow_step4: "4. Clique em Converter e baixe seus arquivos.",
+
+    guide_card_presets_title: "Presets Salvos e Links Compartilháveis",
+    guide_card_presets_desc: "Salve sua configuração favorita com o botão Salvar preset ou clique em Compartilhar link para copiar um link direto.",
 
     guide_sec_modes_h3: "Modos de Conversão Explicados",
     guide_sec_modes_audio: "• Extrair Áudio (MP3 / WAV / AAC): Extrai o som de vídeos em taxas de bits ajustáveis ou WAV sem perdas.",
@@ -402,6 +449,10 @@ export const translations = {
     guide_sec_loudness_h3: "Normalização de Volume EBU R128",
     guide_sec_loudness_p: "O padrão internacional de sonoridade usado pelo Spotify, YouTube e Netflix. Equilibra o volume para evitar picos desconfortáveis ou áudio excessivamente baixo.",
 
+    guide_card_uses_title: "Usos Recomendados",
+    guide_card_uses_podcasts: "• Podcasts e Mensagens de Voz: Garante voz nítida e inteligível.",
+    guide_card_uses_music: "• Música e Trilhas Sonoras: Nível de som equilibrado para ouvir sem sobressaltos.",
+
     guide_sec_features_h3: "Ferramentas Avançadas de Vídeo",
     guide_sec_speed: "• Controle de Velocidade: De 0.25× até 2× com sincronização perfeita de tom e áudio.",
     guide_sec_subs: "• Embutir Legendas (.srt): Grava legendas diretamente no vídeo com bordas nítidas.",
@@ -410,7 +461,13 @@ export const translations = {
     guide_sec_save_frame: "• Salvar Quadro (JPEG): Captura instantaneamente o quadro atual em resolução total.",
 
     guide_sec_privacy_h3: "Como Funciona a Privacidade Local",
-    guide_sec_privacy_p: "Sem envio para nuvens ou servidores remotos. Todo o processamento ocorre na memória RAM local do seu próprio navegador."
+    guide_sec_privacy_p: "Sem envio para nuvens ou servidores remotos. Todo o processamento ocorre na memória RAM local do seu próprio navegador.",
+
+    guide_card_security_title: "Garantias de Segurança",
+    guide_card_security_item1: "• Zero Telemetria em Arquivos: Nenhum arquivo ou nome é enviado para servidores de terceiros.",
+    guide_card_security_item2: "• Funciona Offline: Uma vez carregada a página, as conversões funcionam mesmo sem internet.",
+
+    guide_close_btn_label: "Fechar"
   },
 
   pl: {
@@ -523,14 +580,23 @@ export const translations = {
     // Guide Modal
     guide_title: "Konwerter BeeTales — Podręcznik i Pomoc",
     guide_subtitle: "Wszystko, co musisz wiedzieć o wszystkich narzędziach i funkcjach",
-    guide_tab_overview: "🌟 Przegląd",
-    guide_tab_modes: "🎬 Formaty i Tryby",
-    guide_tab_audio: "🔊 Dźwięk i Loudness",
-    guide_tab_video: "⚡ Wideo i Napisy",
-    guide_tab_privacy: "🛡️ 100% Lokalna Prywatność",
+    guide_tab_overview: "Przegląd",
+    guide_tab_modes: "Formaty i Tryby",
+    guide_tab_audio: "Dźwięk i Loudness",
+    guide_tab_video: "Wideo i Napisy",
+    guide_tab_privacy: "Lokalna Prywatność",
 
     guide_sec_intro_title: "Witamy w BeeTales Media Converter",
     guide_sec_intro_p: "BeeTales to otwartoźródłowa stacja robocza, która przetwarza pliki multimedialne bezpośrednio w przeglądarce za pomocą technologii WebAssembly (FFmpeg). Twoje pliki nigdy nie opuszczają komputera.",
+
+    guide_card_workflow_title: "Szybki Przepływ Pracy",
+    guide_card_workflow_step1: "1. Wybierz Tryb Konwersji (Audio, MP4 lub GIF).",
+    guide_card_workflow_step2: "2. Przeciągnij i upuść pliki wideo do strefy upuszczania.",
+    guide_card_workflow_step3: "3. Dostosuj ustawienia (Jakość, Głośność, Prędkość, Napisy).",
+    guide_card_workflow_step4: "4. Kliknij Konwertuj i pobierz pliki.",
+
+    guide_card_presets_title: "Zapisane Szablony i Udostępnianie Linków",
+    guide_card_presets_desc: "Zapisz ulubioną konfigurację przyciskiem Zapisz szablon lub kliknij Udostępnij link, aby skopiować bezpośredni adres URL.",
 
     guide_sec_modes_h3: "Wyjaśnienie Trybów Konwersji",
     guide_sec_modes_audio: "• Wyodrębnij Dźwięk (MP3 / WAV / AAC): Wyciąga ścieżkę dźwiękową z wideo z możliwością wyboru bitrate lub bezstratnego WAV.",
@@ -540,6 +606,10 @@ export const translations = {
     guide_sec_loudness_h3: "Normalizacja Głośności EBU R128",
     guide_sec_loudness_p: "Międzynarodowy standard głośności stosowany przez Spotify, YouTube i Netflix. Wyrównuje poziom dźwięku bez zniekształceń i nagłych skoków głośności.",
 
+    guide_card_uses_title: "Zalecane Zastosowania",
+    guide_card_uses_podcasts: "• Podcasty i Notatki Głosowe: Zapewnia doskonałą czytelność mowy.",
+    guide_card_uses_music: "• Muzyka i Ścieżki Dźwiękowe: Wyrównany poziom głośności bez konieczności ręcznej regulacji.",
+
     guide_sec_features_h3: "Zaawansowane Narzędzia Wideo",
     guide_sec_speed: "• Kontrola Prędkości: Od 0.25× do 2× z zachowaniem synchronizacji tonu dźwięku.",
     guide_sec_subs: "• Wpalanie Napisów (.srt): Trwale nanosi napisy na obraz wideo z wyraźną obwódką.",
@@ -548,6 +618,12 @@ export const translations = {
     guide_sec_save_frame: "• Zapisz Klatkę (JPEG): Natychmiast zapisuje bieżącą klatkę w pełnej rozdzielczości.",
 
     guide_sec_privacy_h3: "Jak Działa Lokalna Prywatność",
-    guide_sec_privacy_p: "W przeciwieństwie do tradycyjnych konwerterów internetowych, BeeTales uruchamia skompilowany silnik FFmpeg w bezpiecznej pamięci RAM Twojej przeglądarki. Bezpieczne dla poufnych nagrań i pracy offline."
+    guide_sec_privacy_p: "W przeciwieństwie do tradycyjnych konwerterów internetowych, BeeTales uruchamia skompilowany silnik FFmpeg w bezpiecznej pamięci RAM Twojej przeglądarki. Bezpieczne dla poufnych nagrań i pracy offline.",
+
+    guide_card_security_title: "Gwarancje Bezpieczeństwa",
+    guide_card_security_item1: "• Zero Telemetrii Plików: Żadne pliki ani ich nazwy nie są przesyłane na serwery zewnętrzne.",
+    guide_card_security_item2: "• Działa Offline: Po załadowaniu strony konwersje działają bez dostępu do Internetu.",
+
+    guide_close_btn_label: "Zamknij"
   }
 };

@@ -1261,7 +1261,7 @@ legend {
 }
 
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 .reset-floating-button {
@@ -1952,6 +1952,10 @@ legend {
   padding: 20px;
 }
 
+.history-modal.is-hidden {
+  display: none !important;
+}
+
 .history-backdrop {
   position: absolute;
   inset: 0;
@@ -2192,6 +2196,10 @@ legend {
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+.guide-modal.is-hidden {
+  display: none !important;
 }
 
 .guide-backdrop {

@@ -570,18 +570,339 @@ export class KaraokeSyncEngine {
 }
 
 /**
- * Counts vowel count in a word for phonetic duration weighting
+ * Applies a 2nd-order cascaded Butterworth band-pass filter (300Hz - 3400Hz)
+ * to isolate human vocal formants and eliminate sub-bass, kicks, and high-frequency cymbals/hiss.
+ * @param {Float32Array|Array<number>} channelData - Raw PCM audio samples
+ * @param {number} [sampleRate=44100] - Sampling rate in Hz (e.g. 44100, 48000)
+ * @param {number} [lowCut=300] - Lower cutoff frequency in Hz
+ * @param {number} [highCut=3400] - Upper cutoff frequency in Hz
+ * @returns {Float32Array} Filtered PCM samples
  */
-function countVowels(text) {
-  const matches = String(text).match(/[aeiouáéíóúüãõy]/gi);
-  return matches ? matches.length : 1;
+export function applyVocalBandpassFilter(channelData, sampleRate = 44100, lowCut = 300, highCut = 3400) {
+  if (!channelData || !channelData.length) return new Float32Array(0);
+  const len = channelData.length;
+  const filtered = new Float32Array(len);
+
+  // Guard cutoff frequencies within Nyquist limits
+  const nyquist = (sampleRate || 44100) * 0.5;
+  const safeLow = Math.max(20, Math.min(lowCut || 300, nyquist * 0.9));
+  const safeHigh = Math.max(safeLow + 50, Math.min(highCut || 3400, nyquist * 0.95));
+  const q = 0.7071067811865476; // 1 / sqrt(2) for Butterworth response
+
+  // High-Pass Filter Coefficients
+  const wHp = (2 * Math.PI * safeLow) / sampleRate;
+  const cosHp = Math.cos(wHp);
+  const sinHp = Math.sin(wHp);
+  const alphaHp = sinHp / (2 * q);
+
+  const b0Hp = (1 + cosHp) / 2;
+  const b1Hp = -(1 + cosHp);
+  const b2Hp = (1 + cosHp) / 2;
+  const a0Hp = 1 + alphaHp;
+  const a1Hp = -2 * cosHp;
+  const a2Hp = 1 - alphaHp;
+
+  const invA0Hp = 1 / a0Hp;
+  const nb0Hp = b0Hp * invA0Hp;
+  const nb1Hp = b1Hp * invA0Hp;
+  const nb2Hp = b2Hp * invA0Hp;
+  const na1Hp = a1Hp * invA0Hp;
+  const na2Hp = a2Hp * invA0Hp;
+
+  // Pass 1: High-pass
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < len; i++) {
+    const x0 = channelData[i];
+    const y0 = nb0Hp * x0 + nb1Hp * x1 + nb2Hp * x2 - na1Hp * y1 - na2Hp * y2;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+    filtered[i] = y0;
+  }
+
+  // Low-Pass Filter Coefficients
+  const wLp = (2 * Math.PI * safeHigh) / sampleRate;
+  const cosLp = Math.cos(wLp);
+  const sinLp = Math.sin(wLp);
+  const alphaLp = sinLp / (2 * q);
+
+  const b0Lp = (1 - cosLp) / 2;
+  const b1Lp = 1 - cosLp;
+  const b2Lp = (1 - cosLp) / 2;
+  const a0Lp = 1 + alphaLp;
+  const a1Lp = -2 * cosLp;
+  const a2Lp = 1 - alphaLp;
+
+  const invA0Lp = 1 / a0Lp;
+  const nb0Lp = b0Lp * invA0Lp;
+  const nb1Lp = b1Lp * invA0Lp;
+  const nb2Lp = b2Lp * invA0Lp;
+  const na1Lp = a1Lp * invA0Lp;
+  const na2Lp = a2Lp * invA0Lp;
+
+  // Pass 2: Low-pass (in-place on filtered buffer)
+  x1 = 0; x2 = 0; y1 = 0; y2 = 0;
+  for (let i = 0; i < len; i++) {
+    const x0 = filtered[i];
+    const y0 = nb0Lp * x0 + nb1Lp * x1 + nb2Lp * x2 - na1Lp * y1 - na2Lp * y2;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+    filtered[i] = y0;
+  }
+
+  return filtered;
 }
 
 /**
- * Automatically calculates and aligns word timestamps with the audio waveform / voice activity
+ * Computes phonetic weight for a word and analyzes punctuation pauses.
+ * Formula: w = consonants + 1.8 * vowels
+ * @param {string} text - Raw or formatted word text
+ * @returns {Object} { weight: number, pauseType: string, pauseDuration: number, cleanText: string }
+ */
+export function computePhoneticWeight(text) {
+  if (!text || typeof text !== "string") {
+    return { weight: 1.0, pauseType: "none", pauseDuration: 0.04, cleanText: "" };
+  }
+
+  const raw = text.trim();
+  // Strip non-alphanumeric except accented characters
+  const clean = raw.replace(/[^\p{L}\p{N}]/gu, "");
+
+  // Vowels in Spanish, English, Portuguese, Polish, French, German, Italian, etc.
+  const vowelsMatch = clean.match(/[aeiouyáéíóúüãõàèìòùâêîôûäëïöüąęó]/gi);
+  const vowelCount = vowelsMatch ? vowelsMatch.length : 0;
+  const totalLetters = clean.length;
+  const consonantCount = Math.max(0, totalLetters - vowelCount);
+
+  // Base formula: w = consonants + 1.8 * vowels
+  let weight = consonantCount + 1.8 * vowelCount;
+  if (weight < 1.0) weight = Math.max(1.0, totalLetters * 1.2 || 1.0);
+
+  // Analyze punctuation for rhythm/breathing pauses
+  let pauseType = "none";
+  let pauseDuration = 0.04; // Standard spacing between words within a phrase
+
+  if (/[,;—–]/.test(raw) || raw.endsWith("...")) {
+    // Minor pause: breathing / comma
+    pauseType = "minor";
+    pauseDuration = 0.18;
+  } else if (/[.!?]$/.test(raw)) {
+    // Major pause: sentence end / period / exclamation
+    pauseType = "major";
+    pauseDuration = 0.38;
+  }
+
+  return {
+    weight: Number(weight.toFixed(2)),
+    pauseType,
+    pauseDuration,
+    cleanText: clean,
+  };
+}
+
+/**
+ * Detects onset transients and vocal attack times using Logarithmic Spectral Flux / Energy Differentials
+ * @param {Float32Array|Array<number>} channelData - PCM audio samples
+ * @param {number} [sampleRate=44100] - Sample rate in Hz
+ * @param {Object} [options] - Tuning parameters
+ * @returns {Array<number>} Timestamps of detected onsets in seconds
+ */
+export function detectAudioOnsets(channelData, sampleRate = 44100, options = {}) {
+  if (!channelData || !channelData.length) return [];
+
+  const frameMs = options.frameMs || 20; // 20ms frame
+  const hopMs = options.hopMs || 10;     // 10ms hop
+  const frameSize = Math.max(64, Math.floor(sampleRate * (frameMs / 1000)));
+  const hopSize = Math.max(32, Math.floor(sampleRate * (hopMs / 1000)));
+  const totalFrames = Math.floor((channelData.length - frameSize) / hopSize);
+
+  if (totalFrames <= 0) return [];
+
+  // 1. Calculate RMS energy per frame
+  const energies = new Float32Array(totalFrames);
+  for (let f = 0; f < totalFrames; f++) {
+    const offset = f * hopSize;
+    let sumSq = 0;
+    for (let i = 0; i < frameSize; i++) {
+      const v = channelData[offset + i];
+      sumSq += v * v;
+    }
+    energies[f] = Math.sqrt(sumSq / frameSize);
+  }
+
+  // 2. Compute Logarithmic Energy Differentials (Spectral Flux proxy)
+  const odf = new Float32Array(totalFrames);
+  const eps = 1e-4;
+  for (let f = 1; f < totalFrames; f++) {
+    const diff = Math.log(energies[f] + eps) - Math.log(energies[f - 1] + eps);
+    odf[f] = Math.max(0, diff);
+  }
+
+  // 3. Adaptive local thresholding and peak-picking
+  const winHalf = 6; // ~60ms local window
+  const minEnergy = options.minEnergy || 0.005;
+  const sensitivity = options.sensitivity || 1.0;
+  const onsets = [];
+  let lastOnsetTime = -1;
+  const minInterval = 0.07; // Min 70ms between onsets
+
+  for (let f = 1; f < totalFrames - 1; f++) {
+    if (energies[f] < minEnergy) continue;
+
+    // Local mean of ODF
+    let localSum = 0;
+    let localCount = 0;
+    const startW = Math.max(0, f - winHalf);
+    const endW = Math.min(totalFrames - 1, f + winHalf);
+    for (let j = startW; j <= endW; j++) {
+      localSum += odf[j];
+      localCount++;
+    }
+    const localMean = localSum / (localCount || 1);
+    const threshold = localMean * (1.35 / sensitivity) + 0.02;
+
+    // Peak condition: strictly greater than previous, >= next, and > adaptive threshold
+    if (odf[f] > threshold && odf[f] > odf[f - 1] && odf[f] >= odf[f + 1]) {
+      const timeSec = (f * hopSize) / sampleRate;
+      if (timeSec - lastOnsetTime >= minInterval) {
+        onsets.push(Number(timeSec.toFixed(3)));
+        lastOnsetTime = timeSec;
+      }
+    }
+  }
+
+  return onsets;
+}
+
+/**
+ * Identifies active vocal segments using adaptive percentile-based VAD with hysteresis.
+ * Ignores instrumental intros, solos, and interludes while preserving natural singing phrasing.
+ * @param {Float32Array|Array<number>} channelData - Bandpass-filtered PCM audio samples
+ * @param {number} [sampleRate=44100] - Sampling rate in Hz
+ * @param {number} [duration=30] - Total duration in seconds
+ * @param {Object} [options] - Tuning parameters
+ * @returns {Array<Object>} List of vocal segment ranges [{ start: number, end: number }]
+ */
+export function calculateVocalSegments(channelData, sampleRate = 44100, duration = 30, options = {}) {
+  if (!channelData || !channelData.length || duration <= 0) {
+    const leadIn = Math.min(1.0, duration * 0.05);
+    const leadOut = Math.max(0.5, duration * 0.05);
+    return [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
+  }
+
+  const frameMs = 25; // 25ms frames
+  const hopMs = 15;   // 15ms hop
+  const frameSize = Math.max(64, Math.floor(sampleRate * (frameMs / 1000)));
+  const hopSize = Math.max(32, Math.floor(sampleRate * (hopMs / 1000)));
+  const totalFrames = Math.floor((channelData.length - frameSize) / hopSize);
+
+  if (totalFrames <= 0) {
+    return [{ start: 0.5, end: Math.max(1.5, duration - 0.5) }];
+  }
+
+  const energies = new Float32Array(totalFrames);
+  for (let f = 0; f < totalFrames; f++) {
+    const offset = f * hopSize;
+    let sumSq = 0;
+    for (let i = 0; i < frameSize; i++) {
+      const val = channelData[offset + i];
+      sumSq += val * val;
+    }
+    energies[f] = Math.sqrt(sumSq / frameSize);
+  }
+
+  // Sample energies for percentile estimation
+  const sampleStep = Math.max(1, Math.floor(totalFrames / 3000));
+  const sampled = [];
+  for (let i = 0; i < totalFrames; i += sampleStep) {
+    sampled.push(energies[i]);
+  }
+  sampled.sort((a, b) => a - b);
+
+  const p15 = sampled[Math.floor(sampled.length * 0.15)] || 0;
+  const p85 = sampled[Math.floor(sampled.length * 0.85)] || 0;
+  const dynamicRange = Math.max(1e-4, p85 - p15);
+
+  const sensitivity = options.sensitivity || 1.0;
+  // Adaptive thresholds with hysteresis
+  const tOn = Math.max(0.006, p15 + dynamicRange * (0.22 / sensitivity));
+  const tOff = Math.max(0.003, p15 + dynamicRange * (0.10 / sensitivity));
+
+  const maxSilenceFrames = Math.floor(0.35 / (hopMs / 1000)); // 350ms silence triggers segment split
+  const minSegFrames = Math.floor(0.20 / (hopMs / 1000));     // Min 200ms duration
+
+  const rawSegments = [];
+  let inVoice = false;
+  let segStartFrame = 0;
+  let silenceFrames = 0;
+
+  for (let f = 0; f < totalFrames; f++) {
+    const isVoice = inVoice ? energies[f] >= tOff : energies[f] >= tOn;
+    if (isVoice) {
+      if (!inVoice) {
+        inVoice = true;
+        segStartFrame = f;
+      }
+      silenceFrames = 0;
+    } else {
+      if (inVoice) {
+        silenceFrames++;
+        if (silenceFrames > maxSilenceFrames || f === totalFrames - 1) {
+          const segEndFrame = f - silenceFrames;
+          if (segEndFrame - segStartFrame >= minSegFrames) {
+            const startSec = (segStartFrame * hopSize) / sampleRate;
+            const endSec = (segEndFrame * hopSize) / sampleRate;
+            rawSegments.push({
+              start: Math.max(0, Number(startSec.toFixed(2))),
+              end: Math.min(duration, Number(endSec.toFixed(2))),
+            });
+          }
+          inVoice = false;
+          silenceFrames = 0;
+        }
+      }
+    }
+  }
+
+  // Handle segment that reaches end of audio
+  if (inVoice && totalFrames - segStartFrame >= minSegFrames) {
+    rawSegments.push({
+      start: Math.max(0, Number(((segStartFrame * hopSize) / sampleRate).toFixed(2))),
+      end: Math.min(duration, Number(((totalFrames * hopSize) / sampleRate).toFixed(2))),
+    });
+  }
+
+  if (!rawSegments.length) {
+    const leadIn = Math.min(1.0, duration * 0.05);
+    const leadOut = Math.max(0.5, duration * 0.05);
+    return [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
+  }
+
+  // Merge segments with very short gaps (< 250ms) to maintain fluid singing phrases
+  const mergedSegments = [rawSegments[0]];
+  for (let i = 1; i < rawSegments.length; i++) {
+    const prev = mergedSegments[mergedSegments.length - 1];
+    const curr = rawSegments[i];
+    if (curr.start - prev.end <= 0.25) {
+      prev.end = Math.max(prev.end, curr.end);
+    } else {
+      mergedSegments.push(curr);
+    }
+  }
+
+  return mergedSegments;
+}
+
+/**
+ * Automatically calculates and aligns word timestamps with the audio waveform / voice activity.
+ * Incorporates 300Hz-3400Hz vocal bandpass filtering, spectral flux onset detection,
+ * percentile-based VAD hysteresis, phonetic syllabic weighting, punctuation pauses, and lead-in pre-roll.
  * @param {Array<Object>} words - Array of word objects from splitLyricsIntoWords
  * @param {AudioBuffer|Object} audioData - Web Audio API AudioBuffer or object with { channelData, sampleRate, duration }
- * @param {Object} options - Custom tuning parameters
+ * @param {Object} [options] - Custom tuning parameters
  * @returns {Array<Object>} Updated words array with populated start and end timestamps
  */
 export function autoAlignLyricsWithAudio(words, audioData = {}, options = {}) {
@@ -589,9 +910,12 @@ export function autoAlignLyricsWithAudio(words, audioData = {}, options = {}) {
   const duration = Number(audioData.duration) || 30;
   if (duration <= 0) return words;
 
-  let vocalSegments = [];
+  const leadInOffset = options.leadInOffset !== undefined ? Number(options.leadInOffset) : 0.12;
+  const snapToOnsets = options.snapToOnsets !== false;
+  const lowCut = options.lowCut || 300;
+  const highCut = options.highCut || 3400;
 
-  // 1. Analyze waveform if channel data is available
+  // 1. Extract and filter PCM channel
   let channel = null;
   let sampleRate = 44100;
   if (audioData.getChannelData) {
@@ -604,71 +928,20 @@ export function autoAlignLyricsWithAudio(words, audioData = {}, options = {}) {
     sampleRate = audioData.sampleRate || 44100;
   }
 
+  let vocalSegments = [];
+  let detectedOnsets = [];
+
   if (channel && channel.length > 0) {
-    const frameSize = Math.max(256, Math.floor(sampleRate * 0.04)); // 40ms frame
-    const totalFrames = Math.floor(channel.length / frameSize);
-    const energies = new Float32Array(totalFrames);
-
-    let maxEnergy = 0;
-    let avgEnergy = 0;
-
-    for (let f = 0; f < totalFrames; f++) {
-      let sumSq = 0;
-      const offset = f * frameSize;
-      for (let i = 0; i < frameSize; i++) {
-        const val = channel[offset + i];
-        sumSq += val * val;
-      }
-      const rms = Math.sqrt(sumSq / frameSize);
-      energies[f] = rms;
-      if (rms > maxEnergy) maxEnergy = rms;
-      avgEnergy += rms;
-    }
-    avgEnergy /= (totalFrames || 1);
-
-    // Adaptive threshold for vocal presence
-    const threshold = Math.max(0.008, avgEnergy * 0.85);
-
-    let inVocal = false;
-    let segStart = 0;
-    const minSegFrames = Math.floor(0.25 / 0.04);
-    const maxSilenceFrames = Math.floor(0.40 / 0.04);
-    let silenceCount = 0;
-
-    for (let f = 0; f < totalFrames; f++) {
-      const isVoice = energies[f] >= threshold;
-      const timeSec = (f * frameSize) / sampleRate;
-
-      if (isVoice) {
-        if (!inVocal) {
-          inVocal = true;
-          segStart = timeSec;
-        }
-        silenceCount = 0;
-      } else {
-        if (inVocal) {
-          silenceCount++;
-          if (silenceCount > maxSilenceFrames || f === totalFrames - 1) {
-            const segEnd = timeSec - (silenceCount * 0.04);
-            if (segEnd - segStart >= 0.2) {
-              vocalSegments.push({ start: Math.max(0, segStart), end: Math.min(duration, segEnd) });
-            }
-            inVocal = false;
-            silenceCount = 0;
-          }
-        }
-      }
-    }
-  }
-
-  // Fallback: If no distinct voice segments were found, create a uniform span
-  if (!vocalSegments.length) {
+    const filteredPCM = applyVocalBandpassFilter(channel, sampleRate, lowCut, highCut);
+    vocalSegments = calculateVocalSegments(filteredPCM, sampleRate, duration, options);
+    detectedOnsets = detectAudioOnsets(filteredPCM, sampleRate, options);
+  } else {
     const leadIn = Math.min(1.0, duration * 0.05);
     const leadOut = Math.max(0.5, duration * 0.05);
     vocalSegments = [{ start: leadIn, end: Math.max(leadIn + 1, duration - leadOut) }];
   }
 
-  // 2. Group words by line or block for natural phrasing
+  // 2. Group words by block / phrase
   const blocksMap = new Map();
   words.forEach((w) => {
     const bIdx = w.blockIndex !== undefined ? w.blockIndex : 0;
@@ -677,58 +950,104 @@ export function autoAlignLyricsWithAudio(words, audioData = {}, options = {}) {
   });
 
   const blockGroups = Array.from(blocksMap.values());
+  if (!blockGroups.length) return words;
 
-  // 3. Map word blocks across vocal segments
-  const totalActiveDuration = vocalSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
-
-  // Compute weight for each block based on total syllables/characters
-  const blockWeights = blockGroups.map((group) => {
-    return group.reduce((sum, w) => {
-      const len = (w.text || "").length;
-      const vowels = countVowels(w.text);
-      return sum + len + vowels * 1.5;
-    }, 0);
+  // 3. Compute phonetic weights and punctuation pauses for each word and block
+  const blockPhonetics = blockGroups.map((group) => {
+    const wordInfos = group.map((w) => computePhoneticWeight(w.text));
+    const totalWeight = wordInfos.reduce((sum, item) => sum + item.weight, 0);
+    const totalPause = wordInfos.reduce((sum, item) => sum + item.pauseDuration, 0);
+    return {
+      wordInfos,
+      totalWeight: Math.max(1.0, totalWeight),
+      totalPause,
+      combinedWeight: totalWeight + totalPause * 3.0,
+    };
   });
 
-  const sumBlockWeights = blockWeights.reduce((a, b) => a + b, 0) || 1;
+  const totalActiveDuration = vocalSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+  const sumCombinedWeights = blockPhonetics.reduce((sum, b) => sum + b.combinedWeight, 0) || 1;
 
+  // 4. Distribute blocks across vocal segments
   let currentSegIdx = 0;
   let currentSegOffset = vocalSegments[0].start;
 
   blockGroups.forEach((group, bIdx) => {
-    const bWeight = blockWeights[bIdx];
-    const blockDuration = Math.max(0.6, (bWeight / sumBlockWeights) * totalActiveDuration);
+    const bInfo = blockPhonetics[bIdx];
+    const targetBlockDuration = Math.max(
+      0.6,
+      (bInfo.combinedWeight / sumCombinedWeights) * totalActiveDuration
+    );
 
-    let seg = vocalSegments[currentSegIdx];
-    if (!seg) {
-      seg = vocalSegments[vocalSegments.length - 1];
-    }
+    let seg = vocalSegments[currentSegIdx] || vocalSegments[vocalSegments.length - 1];
 
     let bStart = currentSegOffset;
-    let bEnd = bStart + blockDuration;
+    let bEnd = bStart + targetBlockDuration;
 
-    // Advance to next segment if overflowing
-    if (bEnd > seg.end && currentSegIdx < vocalSegments.length - 1) {
+    // Advance to next vocal segment if overflowing current segment and more segments exist
+    if (bEnd > seg.end + 0.2 && currentSegIdx < vocalSegments.length - 1) {
       currentSegIdx++;
       seg = vocalSegments[currentSegIdx];
       bStart = seg.start;
-      bEnd = bStart + blockDuration;
+      bEnd = bStart + targetBlockDuration;
     }
 
-    currentSegOffset = bEnd + 0.15; // Small pause between blocks
+    // Determine pause after this block (larger if last word has major punctuation)
+    const lastWordInfo = bInfo.wordInfos[bInfo.wordInfos.length - 1];
+    const postBlockPause = lastWordInfo?.pauseType === "major" ? 0.35 : 0.15;
+    currentSegOffset = bEnd + postBlockPause;
 
-    // Distribute individual words inside block
-    const wordWeights = group.map((w) => (w.text || "").length + countVowels(w.text) * 1.5);
-    const sumWordWeights = wordWeights.reduce((a, b) => a + b, 0) || 1;
+    // Distribute individual words inside block span
     const blockSpan = Math.max(0.4, bEnd - bStart);
+    const sumWordWeights = bInfo.totalWeight;
 
     let wCursor = bStart;
+
     group.forEach((w, wIdx) => {
-      const wDur = Math.max(0.12, (wordWeights[wIdx] / sumWordWeights) * blockSpan);
-      w.start = Number(wCursor.toFixed(2));
-      w.end = Number((wCursor + wDur).toFixed(2));
-      wCursor += wDur;
+      const wInfo = bInfo.wordInfos[wIdx];
+      const wDuration = Math.max(0.12, (wInfo.weight / sumWordWeights) * (blockSpan - bInfo.totalPause * 0.3));
+
+      let calculatedStart = wCursor;
+      let calculatedEnd = calculatedStart + wDuration;
+
+      // Snap word start to nearest detected onset transient if within +/- 150ms window
+      if (snapToOnsets && detectedOnsets.length > 0) {
+        let bestOnset = null;
+        let bestDiff = 0.15; // 150ms snap tolerance
+
+        for (const onset of detectedOnsets) {
+          const diff = Math.abs(onset - calculatedStart);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestOnset = onset;
+          }
+        }
+
+        if (bestOnset !== null) {
+          calculatedStart = bestOnset;
+          calculatedEnd = calculatedStart + wDuration;
+        }
+      }
+
+      // Apply Lead-in latency compensation (so highlight coincides with perceived audio attack)
+      const adjustedStart = Math.max(0, calculatedStart - leadInOffset);
+      const adjustedEnd = Math.max(adjustedStart + 0.10, calculatedEnd - (leadInOffset * 0.5));
+
+      w.start = Number(adjustedStart.toFixed(2));
+      w.end = Number(Math.min(duration, Math.max(w.start + 0.10, adjustedEnd)).toFixed(2));
+
+      // Advance cursor for next word, adding word-level punctuation pause
+      wCursor = calculatedEnd + (wInfo.pauseDuration || 0.04);
     });
+
+    // Post-pass on group to guarantee strict monotonicity: w[i].end <= w[i+1].start or clean abutting
+    for (let i = 0; i < group.length - 1; i++) {
+      const curr = group[i];
+      const next = group[i + 1];
+      if (curr.end > next.start) {
+        curr.end = Number(Math.max(curr.start + 0.08, next.start).toFixed(2));
+      }
+    }
   });
 
   return words;

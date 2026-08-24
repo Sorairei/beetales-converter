@@ -2412,11 +2412,14 @@ function initKaraokeStudio() {
 
       const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(selectedFiles[0])?.duration) || 30;
 
-      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration });
+      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
+        leadInOffset: 0.12,
+        snapToOnsets: true,
+      });
       karaokeEngine.setWords(alignedWords);
       renderWordChipsQueue();
       updateSubtitleOverlay();
-      setStatus(`⚡ Auto-aligned ${alignedWords.length} words with audio timing! Play preview or adjust with ±0.2s.`);
+      setStatus(`⚡ Auto-aligned ${alignedWords.length} words with voice onset & tempo! Play preview or adjust with ±0.2s.`);
     });
   }
 

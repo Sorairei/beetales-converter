@@ -12,8 +12,8 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-sprint2" />
-    <link rel="stylesheet" href="theme.css?v=20260823-sprint2" />
+    <link rel="stylesheet" href="style.css?v=20260823-sprint3" />
+    <link rel="stylesheet" href="theme.css?v=20260823-sprint3" />
   </head>
   <body>
     <main class="app-shell">
@@ -278,6 +278,33 @@
                 <option value="warm">Cinematic warm</option>
               </select>
             </fieldset>
+            <fieldset class="settings-full aux-file-fieldset">
+              <legend>Subtitles & Custom Audio (optional)</legend>
+              <div class="aux-files-grid">
+                <div class="aux-file-box">
+                  <label class="aux-file-button" for="subtitles-file" id="subtitles-label">
+                    <span aria-hidden="true">📄</span>
+                    <span>Burn subtitles (.srt)</span>
+                    <input id="subtitles-file" name="subtitles-file" type="file" accept=".srt,.vtt" />
+                  </label>
+                  <span class="aux-file-status is-hidden" id="subtitles-status">
+                    <span class="aux-file-name" id="subtitles-name"></span>
+                    <button type="button" class="aux-file-remove" id="subtitles-remove" aria-label="Remove subtitles">×</button>
+                  </span>
+                </div>
+                <div class="aux-file-box">
+                  <label class="aux-file-button" for="external-audio-file" id="external-audio-label">
+                    <span aria-hidden="true">🎵</span>
+                    <span>Replace audio track</span>
+                    <input id="external-audio-file" name="external-audio-file" type="file" accept="audio/*,.mp3,.wav,.aac,.m4a,.ogg" />
+                  </label>
+                  <span class="aux-file-status is-hidden" id="external-audio-status">
+                    <span class="aux-file-name" id="external-audio-name"></span>
+                    <button type="button" class="aux-file-remove" id="external-audio-remove" aria-label="Remove custom audio">×</button>
+                  </span>
+                </div>
+              </div>
+            </fieldset>
           </div>
 
           <fieldset class="trim-settings">
@@ -386,10 +413,37 @@
       </footer>
     </main>
 
-    <button class="reset-floating-button" id="reset-defaults" type="button" aria-label="Restore all default settings" title="Restore all default settings">
-      <span aria-hidden="true">&#8634;</span>
-      Reset
-    </button>
+    <div class="floating-controls">
+      <button class="history-floating-button" id="history-toggle" type="button" aria-label="View conversion history and savings" title="View conversion history and savings">
+        <span aria-hidden="true">📊</span>
+        <span class="history-badge" id="history-badge">History</span>
+      </button>
+
+      <button class="reset-floating-button" id="reset-defaults" type="button" aria-label="Restore all default settings" title="Restore all default settings">
+        <span aria-hidden="true">&#8634;</span>
+        Reset
+      </button>
+    </div>
+
+    <!-- Conversion history modal -->
+    <div class="history-modal is-hidden" id="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
+      <div class="history-backdrop" id="history-backdrop"></div>
+      <div class="history-dialog">
+        <div class="history-header">
+          <div>
+            <h3 id="history-title">Conversion History & Space Savings</h3>
+            <p class="history-stats-subtitle" id="history-stats-subtitle">No conversions yet in this session.</p>
+          </div>
+          <button class="history-close-button" id="history-close" type="button" aria-label="Close history">✕</button>
+        </div>
+        <div class="history-list-container">
+          <div class="history-list" id="history-list"></div>
+        </div>
+        <div class="history-footer">
+          <button class="history-clear-button" id="history-clear" type="button">Clear history</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="app.js?v=20260717-conversion-lock"></script>
   </body>

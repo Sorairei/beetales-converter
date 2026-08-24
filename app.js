@@ -70,7 +70,7 @@ const waveformCanvas = $("#waveform-canvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const waveformCtx = waveformCanvas.getContext("2d");
 
-// Sprint 1 & 2 new feature DOM refs
+// Sprint 1, 2 & 3 new feature DOM refs
 const saveFrameBar = $("#save-frame-bar");
 const saveFrameButton = $("#save-frame-button");
 const presetsList = $("#presets-list");
@@ -85,6 +85,28 @@ const gifSpeed = $("#gif-speed");
 const shareConfigButton = $("#share-config-button");
 const mp4AudioTrack = $("#mp4-audio-track");
 const mp4ColorFilter = $("#mp4-color-filter");
+
+const subtitlesInput = $("#subtitles-file");
+const subtitlesStatus = $("#subtitles-status");
+const subtitlesName = $("#subtitles-name");
+const subtitlesRemove = $("#subtitles-remove");
+
+const externalAudioInput = $("#external-audio-file");
+const externalAudioStatus = $("#external-audio-status");
+const externalAudioName = $("#external-audio-name");
+const externalAudioRemove = $("#external-audio-remove");
+
+const historyToggle = $("#history-toggle");
+const historyModal = $("#history-modal");
+const historyBackdrop = $("#history-backdrop");
+const historyClose = $("#history-close");
+const historyClear = $("#history-clear");
+const historyList = $("#history-list");
+const historyStatsSubtitle = $("#history-stats-subtitle");
+const historyBadge = $("#history-badge");
+
+let selectedSubtitlesFile = null;
+let selectedExternalAudioFile = null;
 
 const FRAME_STEP = 1 / 30;
 const TIMELINE_THUMBNAILS = 12;
@@ -200,6 +222,7 @@ restorePreferences();
 applyUrlParams();
 updateModeUI({ resetFiles: false });
 renderPresets();
+updateHistoryBadge();
 
 async function handleFiles(fileCollection) {
   if (conversionInProgress) return;
@@ -524,15 +547,36 @@ async function convertFile(file, mode, index, trim) {
   if (mode === "gif" && getGifOutputExtension() === "webp") return convertToWebP(file, index, trim);
   const token = `${Date.now()}-${index}`;
   const inputName = `input-${token}.${getFileExtension(file.name) || "video"}`;
+  const srtName = `subs-${token}.srt`;
+  const extAudioName = selectedExternalAudioFile ? `extaudio-${token}.${getFileExtension(selectedExternalAudioFile.name) || "mp3"}` : null;
   const outputName = getOutputName(file.name, mode);
   let wroteInput = false;
+  let wroteSrt = false;
+  let wroteExtAudio = false;
   let wroteOutput = false;
   try {
     await ffmpeg.writeFile(inputName, await fetchFile(file));
     wroteInput = true;
-    const initialArgs = mode === "mp4" ? getMp4Args(inputName, outputName, "h264", trim) : mode === "gif" ? getGifArgs(inputName, outputName, trim) : getAudioArgs(inputName, outputName, trim);
+
+    if (mode === "mp4" && selectedSubtitlesFile) {
+      await ffmpeg.writeFile(srtName, await fetchFile(selectedSubtitlesFile));
+      wroteSrt = true;
+    }
+    if (mode === "mp4" && selectedExternalAudioFile && extAudioName) {
+      await ffmpeg.writeFile(extAudioName, await fetchFile(selectedExternalAudioFile));
+      wroteExtAudio = true;
+    }
+
+    const initialArgs = mode === "mp4"
+      ? getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null)
+      : mode === "gif"
+      ? getGifArgs(inputName, outputName, trim)
+      : getAudioArgs(inputName, outputName, trim);
+
     let exitCode = await ffmpeg.exec(initialArgs);
-    if (mode === "mp4" && exitCode !== 0) exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4", trim));
+    if (mode === "mp4" && exitCode !== 0) {
+      exitCode = await ffmpeg.exec(getMp4Args(inputName, outputName, "mpeg4", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null));
+    }
     if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
     wroteOutput = true;
     const data = await ffmpeg.readFile(outputName);
@@ -540,9 +584,24 @@ async function convertFile(file, mode, index, trim) {
     const blob = new Blob([data], { type: outputMimeTypes[getOutputExtension(mode)] });
     const url = URL.createObjectURL(blob);
     resultUrls.push(url);
+
+    recordConversionHistory({
+      name: file.name,
+      outputName,
+      mode,
+      inputSize: file.size,
+      outputSize: blob.size,
+      timestamp: Date.now(),
+    });
+
     return { file, outputName, outputSize: blob.size, url };
   } finally {
-    await cleanupFiles(...(wroteInput ? [inputName] : []), ...(wroteOutput ? [outputName] : []));
+    await cleanupFiles(
+      ...(wroteInput ? [inputName] : []),
+      ...(wroteSrt ? [srtName] : []),
+      ...(wroteExtAudio && extAudioName ? [extAudioName] : []),
+      ...(wroteOutput ? [outputName] : [])
+    );
   }
 }
 
@@ -622,7 +681,7 @@ function getAudioArgs(inputName, outputName, trim) {
   return ["-hide_banner", "-y", ...getTrimInputArgs(trim), "-i", inputName, ...getTrimDurationArgs(trim), ...audioOutputArgs[format], ...(format === "wav" ? [] : ["-b:a", bitrate]), ...loudnessArgs, outputName];
 }
 
-function getMp4Args(inputName, outputName, encoder, trim) {
+function getMp4Args(inputName, outputName, encoder, trim, srtName = null, extAudioName = null) {
   const crf = videoQuality.value;
   const fallbackQuality = crf === "18" ? "3" : crf === "28" ? "8" : "5";
   const videoArgs = encoder === "mpeg4" ? ["-c:v", "mpeg4", "-q:v", fallbackQuality] : ["-c:v", "libx264", "-preset", "veryfast", "-crf", crf];
@@ -642,12 +701,23 @@ function getMp4Args(inputName, outputName, encoder, trim) {
     videoFilters.push("colorbalance=rs=0.08:gs=0.02:bs=-0.08");
   }
 
+  if (srtName) {
+    videoFilters.push(`subtitles=${srtName}`);
+  }
+
   const vfArgs = videoFilters.length ? ["-vf", videoFilters.join(",")] : [];
 
   const audioTrackVal = mp4AudioTrack?.value || "stereo";
+  let audioInputs = [];
   let audioMappingAndCodec = [];
 
-  if (audioTrackVal === "mute") {
+  if (extAudioName) {
+    audioInputs = ["-i", extAudioName];
+    const audioFilters = [];
+    if (speedVal !== 1) audioFilters.push(getAtempoChain(speedVal));
+    const afArgs = audioFilters.length ? ["-af", audioFilters.join(",")] : [];
+    audioMappingAndCodec = ["-map", "1:a:0", ...afArgs, "-c:a", "aac", "-b:a", "160k", "-shortest"];
+  } else if (audioTrackVal === "mute") {
     audioMappingAndCodec = ["-an"];
   } else {
     const audioFilters = [];
@@ -663,6 +733,7 @@ function getMp4Args(inputName, outputName, encoder, trim) {
     ...getTrimInputArgs(trim),
     "-i",
     inputName,
+    ...audioInputs,
     ...getTrimDurationArgs(trim),
     "-map",
     "0:v:0",
@@ -806,6 +877,14 @@ function restoreAllDefaults() {
   if (loudnessNormalize) loudnessNormalize.checked = false;
   if (mp4AudioTrack) mp4AudioTrack.value = "stereo";
   if (mp4ColorFilter) mp4ColorFilter.value = "none";
+  selectedSubtitlesFile = null;
+  if (subtitlesInput) subtitlesInput.value = "";
+  if (subtitlesStatus) subtitlesStatus.classList.add("is-hidden");
+  if (subtitlesName) subtitlesName.textContent = "";
+  selectedExternalAudioFile = null;
+  if (externalAudioInput) externalAudioInput.value = "";
+  if (externalAudioStatus) externalAudioStatus.classList.add("is-hidden");
+  if (externalAudioName) externalAudioName.textContent = "";
   trimStart.value = "";
   trimEnd.value = "";
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
@@ -1507,6 +1586,153 @@ presetNameInput.addEventListener("keydown", (e) => {
 });
 saveFrameButton.addEventListener("click", saveCurrentFrame);
 if (shareConfigButton) shareConfigButton.addEventListener("click", handleShareConfig);
+
+// Sprint 3 event listeners
+if (subtitlesInput) {
+  subtitlesInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    selectedSubtitlesFile = file;
+    if (subtitlesName) subtitlesName.textContent = file.name;
+    if (subtitlesStatus) subtitlesStatus.classList.remove("is-hidden");
+    setStatus(`Subtitles file "${file.name}" attached.`);
+  });
+}
+
+if (subtitlesRemove) {
+  subtitlesRemove.addEventListener("click", () => {
+    selectedSubtitlesFile = null;
+    if (subtitlesInput) subtitlesInput.value = "";
+    if (subtitlesStatus) subtitlesStatus.classList.add("is-hidden");
+    if (subtitlesName) subtitlesName.textContent = "";
+  });
+}
+
+if (externalAudioInput) {
+  externalAudioInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    selectedExternalAudioFile = file;
+    if (externalAudioName) externalAudioName.textContent = file.name;
+    if (externalAudioStatus) externalAudioStatus.classList.remove("is-hidden");
+    setStatus(`Custom audio track "${file.name}" attached.`);
+  });
+}
+
+if (externalAudioRemove) {
+  externalAudioRemove.addEventListener("click", () => {
+    selectedExternalAudioFile = null;
+    if (externalAudioInput) externalAudioInput.value = "";
+    if (externalAudioStatus) externalAudioStatus.classList.add("is-hidden");
+    if (externalAudioName) externalAudioName.textContent = "";
+  });
+}
+
+if (historyToggle) historyToggle.addEventListener("click", openHistoryModal);
+if (historyClose) historyClose.addEventListener("click", closeHistoryModal);
+if (historyBackdrop) historyBackdrop.addEventListener("click", closeHistoryModal);
+if (historyClear) historyClear.addEventListener("click", clearHistory);
+
+// =====================================================================
+// Sprint 3 — Conversion History & Savings
+// =====================================================================
+
+const HISTORY_KEY = "beetales-converter-history-v1";
+
+function loadHistoryFromStorage() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; }
+}
+
+function saveHistoryToStorage(history) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch { /* storage disabled */ }
+}
+
+function recordConversionHistory(entry) {
+  const history = loadHistoryFromStorage();
+  history.unshift(entry);
+  if (history.length > 25) history.pop();
+  saveHistoryToStorage(history);
+  updateHistoryBadge();
+}
+
+function updateHistoryBadge() {
+  const history = loadHistoryFromStorage();
+  let totalSaved = 0;
+  history.forEach((h) => {
+    if (h.inputSize && h.outputSize && h.inputSize > h.outputSize) {
+      totalSaved += (h.inputSize - h.outputSize);
+    }
+  });
+  if (historyBadge) {
+    historyBadge.textContent = history.length ? `${formatBytes(totalSaved)} saved` : "History";
+  }
+}
+
+function renderHistoryModal() {
+  const history = loadHistoryFromStorage();
+  if (!historyList) return;
+  historyList.replaceChildren();
+  if (!history.length) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty-text";
+    empty.textContent = "No conversions recorded yet. Converted files will appear here along with space savings.";
+    historyList.appendChild(empty);
+    if (historyStatsSubtitle) historyStatsSubtitle.textContent = "0 files converted · 0 B saved";
+    return;
+  }
+  let totalInput = 0;
+  let totalOutput = 0;
+  history.forEach((h) => {
+    totalInput += (h.inputSize || 0);
+    totalOutput += (h.outputSize || 0);
+
+    const item = document.createElement("div");
+    item.className = "history-item";
+
+    const info = document.createElement("div");
+    info.className = "history-item-info";
+    const name = document.createElement("strong");
+    name.textContent = h.outputName || h.name;
+    const details = document.createElement("small");
+    const diff = (h.inputSize || 0) - (h.outputSize || 0);
+    const dateStr = new Date(h.timestamp || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    details.textContent = `${formatBytes(h.inputSize || 0)} → ${formatBytes(h.outputSize || 0)} (${h.mode.toUpperCase()}) · ${dateStr}`;
+    info.append(name, details);
+
+    const badge = document.createElement("span");
+    badge.className = "savings-badge";
+    if (diff > 0) {
+      const pct = Math.round((diff / (h.inputSize || 1)) * 100);
+      badge.textContent = `-${pct}% (${formatBytes(diff)})`;
+    } else {
+      badge.textContent = "Converted";
+    }
+
+    item.append(info, badge);
+    historyList.append(item);
+  });
+
+  const netSaved = Math.max(0, totalInput - totalOutput);
+  if (historyStatsSubtitle) {
+    historyStatsSubtitle.textContent = `${history.length} file${history.length === 1 ? "" : "s"} converted · ${formatBytes(netSaved)} saved`;
+  }
+}
+
+function openHistoryModal() {
+  renderHistoryModal();
+  if (historyModal) historyModal.classList.remove("is-hidden");
+}
+
+function closeHistoryModal() {
+  if (historyModal) historyModal.classList.add("is-hidden");
+}
+
+function clearHistory() {
+  saveHistoryToStorage([]);
+  renderHistoryModal();
+  updateHistoryBadge();
+  setStatus("Conversion history cleared.");
+}
 
 // =====================================================================
 // Sprint 1 & 2 — Saved presets

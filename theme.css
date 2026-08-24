@@ -738,4 +738,63 @@ select:focus-visible {
   box-shadow: 0 -4px 14px rgba(245, 166, 35, 0.25);
 }
 
+/* --------------------------------------------------------------------------
+   Sprint 3 — Aux Files & History Theme
+   -------------------------------------------------------------------------- */
+
+.aux-file-button {
+  border-color: rgba(74, 138, 40, 0.45);
+  background: rgba(74, 138, 40, 0.06);
+  color: var(--text);
+}
+
+.aux-file-button:hover {
+  border-color: var(--accent-strong);
+  background: rgba(110, 200, 50, 0.12);
+  color: var(--text-strong);
+}
+
+.aux-file-status {
+  border-color: rgba(74, 138, 40, 0.5);
+  background: rgba(110, 200, 50, 0.12);
+  color: var(--text-strong);
+}
+
+.history-floating-button {
+  border-color: rgba(74, 138, 40, 0.5);
+  background: rgba(5, 14, 7, 0.95);
+  color: var(--text-strong);
+  box-shadow: 0 12px 32px rgba(0, 8, 2, 0.52);
+}
+
+.history-floating-button:hover {
+  border-color: var(--amber-strong);
+  background: rgba(13, 30, 16, 0.98);
+  box-shadow: 0 14px 36px rgba(0, 8, 2, 0.58), 0 0 12px rgba(245, 166, 35, 0.15);
+}
+
+.history-dialog {
+  border-color: rgba(74, 138, 40, 0.6);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgba(0, 8, 2, 0.8);
+}
+
+.history-header,
+.history-footer {
+  border-color: rgba(42, 80, 48, 0.6);
+  background: var(--panel-strong);
+}
+
+.history-item {
+  border-color: rgba(42, 80, 48, 0.5);
+  background: rgba(13, 30, 16, 0.6);
+}
+
+.savings-badge {
+  border-color: rgba(110, 200, 50, 0.45);
+  background: rgba(110, 200, 50, 0.18);
+  color: var(--accent-strong);
+}
+
+
 

@@ -12,8 +12,8 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="favicon.png" />
-    <link rel="stylesheet" href="style.css?v=20260823-sprint4-fix" />
-    <link rel="stylesheet" href="theme.css?v=20260823-sprint4-fix" />
+    <link rel="stylesheet" href="style.css?v=20260823-i18n-complete" />
+    <link rel="stylesheet" href="theme.css?v=20260823-i18n-complete" />
   </head>
   <body>
     <main class="app-shell">
@@ -35,12 +35,12 @@
               height="916"
             />
             <figcaption class="product-heading">
-              <span>Local media tools</span>
-              <h1 id="app-title">Media Converter</h1>
+              <span data-i18n="app_tagline">Local media tools</span>
+              <h1 id="app-title" data-i18n="app_title_heading">Media Converter</h1>
             </figcaption>
           </figure>
 
-          <p class="lead">
+          <p class="lead" data-i18n="app_lead">
             Extract audio, optimize MP4, or turn a video clip into GIF directly in your browser.
           </p>
           <div class="format-strip" aria-label="Available conversion options">
@@ -55,7 +55,7 @@
           <div class="user-utilities-bar">
             <div class="language-picker">
               <span class="lang-icon" aria-hidden="true">&#9672;</span>
-              <label for="language-select" class="sr-only">Language</label>
+              <label for="language-select" class="sr-only" data-i18n="select_language">Language</label>
               <select id="language-select" class="language-select" aria-label="Language selector">
                 <option value="en" selected>English (EN)</option>
                 <option value="es">Español (ES)</option>
@@ -126,10 +126,10 @@
             <div class="presets-list" id="presets-list" role="list" aria-label="Saved presets"></div>
             <div class="presets-actions">
               <button class="save-preset-button share-config-button" id="share-config-button" type="button" title="Copy shareable link with current configuration">
-                <span aria-hidden="true">🔗</span> <span id="share-config-text">Share link</span>
+                <span aria-hidden="true">&#9678;</span> <span id="share-config-text" data-i18n="share_link">Share link</span>
               </button>
               <button class="save-preset-button" id="save-preset-button" type="button" title="Save current settings as a preset">
-                <span aria-hidden="true">＋</span> Save preset
+                <span aria-hidden="true">&#43;</span> <span data-i18n="save_preset">Save preset</span>
               </button>
               <div class="save-preset-inline is-hidden" id="save-preset-inline">
                 <input type="text" id="preset-name-input" class="preset-name-input" placeholder="Preset name…" maxlength="24" autocomplete="off" />
@@ -142,30 +142,30 @@
           <label class="drop-zone" for="video-file" id="drop-zone">
             <input id="video-file" name="video-file" type="file" accept="video/*,.webm" multiple />
             <span class="drop-icon" aria-hidden="true"></span>
-            <span class="drop-title" id="drop-title">Select one or more video files</span>
-            <span class="drop-hint" id="drop-hint">You can also drag and drop them here</span>
+            <span class="drop-title" id="drop-title" data-i18n="drop_title">Select one or more video files</span>
+            <span class="drop-hint" id="drop-hint" data-i18n="drop_hint">You can also drag and drop them here</span>
           </label>
 
           <div class="file-card is-hidden" id="file-card" aria-live="polite">
             <div class="file-summary">
-              <p class="file-label">Conversion queue</p>
+              <p class="file-label" data-i18n="queue_label">Conversion queue</p>
               <p class="file-name" id="file-name"></p>
               <p class="file-size" id="file-size"></p>
             </div>
-            <button class="clear-button" id="clear-files" type="button">Clear</button>
+            <button class="clear-button" id="clear-files" type="button" data-i18n="clear_button">Clear</button>
             <ol class="file-list" id="file-list"></ol>
           </div>
 
           <section class="preview-panel is-hidden" id="preview-panel">
             <div class="preview-heading">
               <div>
-                <p class="file-label">Preview</p>
+                <p class="file-label" data-i18n="preview_label">Preview</p>
                 <h2 id="preview-title"></h2>
               </div>
               <span class="preview-meta-bar" id="preview-meta"></span>
             </div>
             <div class="crop-container" id="crop-container">
-              <video id="video-preview" controls preload="none"><!-- L-03: src is always a local blob URL, so eager preload is unnecessary --></video>
+              <video id="video-preview" controls preload="none"></video>
               <div class="frame-nav" id="frame-nav">
                 <button class="frame-nav-button" id="frame-prev" type="button" aria-label="Previous frame" title="Previous frame">&#9664;</button>
                 <button class="frame-nav-button" id="frame-next" type="button" aria-label="Next frame" title="Next frame">&#9654;</button>
@@ -193,17 +193,17 @@
               <canvas class="waveform-canvas is-hidden" id="waveform-canvas" height="48"></canvas>
             </div>
             <div class="crop-actions is-hidden" id="crop-actions">
-              <button class="crop-action-button" id="crop-select-button" type="button">Select area</button>
-              <button class="crop-action-button is-hidden" id="crop-reset-button" type="button">Reset crop</button>
+              <button class="crop-action-button" id="crop-select-button" type="button" data-i18n="select_area">Select area</button>
+              <button class="crop-action-button is-hidden" id="crop-reset-button" type="button" data-i18n="reset_crop">Reset crop</button>
             </div>
             <div class="save-frame-bar is-hidden" id="save-frame-bar">
-              <button class="save-frame-button" id="save-frame-button" type="button">Save frame</button>
+              <button class="save-frame-button" id="save-frame-button" type="button" data-i18n="save_frame">Save frame</button>
             </div>
           </section>
 
           <div class="settings-grid" id="audio-settings">
             <fieldset>
-              <legend>Output format</legend>
+              <legend data-i18n="output_format">Output format</legend>
               <div class="segmented-control">
                 <label>
                   <input type="radio" name="format" value="mp3" checked />
@@ -221,7 +221,7 @@
             </fieldset>
 
             <fieldset>
-              <legend>Bitrate</legend>
+              <legend data-i18n="bitrate_legend">Bitrate</legend>
               <div class="segmented-control">
                 <label>
                   <input type="radio" name="bitrate" value="128k" checked />
@@ -238,13 +238,13 @@
               </div>
             </fieldset>
             <fieldset class="settings-full">
-              <legend>Loudness</legend>
+              <legend data-i18n="loudness_legend">Loudness</legend>
               <label class="loudness-toggle" for="loudness-normalize">
                 <input type="checkbox" id="loudness-normalize" name="loudness-normalize" />
                 <span class="toggle-thumb" aria-hidden="true"></span>
                 <span class="loudness-label">
-                  <strong>Normalize loudness (EBU R128)</strong>
-                  <small>Streaming standard · Spotify, YouTube, Netflix</small>
+                  <strong data-i18n="loudness_title">Normalize loudness (EBU R128)</strong>
+                  <small data-i18n="loudness_desc">Streaming standard · Spotify, YouTube, Netflix</small>
                 </span>
               </label>
             </fieldset>
@@ -252,58 +252,58 @@
 
           <div class="settings-grid mp4-settings is-hidden" id="mp4-settings">
             <fieldset>
-              <legend>Video quality</legend>
+              <legend data-i18n="video_quality">Video quality</legend>
               <select class="setting-select" id="video-quality" name="video-quality">
-                <option value="28">Smaller file</option>
-                <option value="23" selected>Balanced</option>
-                <option value="18">High quality</option>
+                <option value="28" data-i18n="opt_quality_small">Smaller file</option>
+                <option value="23" selected data-i18n="opt_quality_balanced">Balanced</option>
+                <option value="18" data-i18n="opt_quality_high">High quality</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Resolution</legend>
+              <legend data-i18n="resolution">Resolution</legend>
               <select class="setting-select" id="video-resolution" name="video-resolution">
-                <option value="original" selected>Original</option>
+                <option value="original" selected data-i18n="opt_res_original">Original</option>
                 <option value="1080">1080p</option>
                 <option value="720">720p</option>
                 <option value="480">480p</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Speed</legend>
+              <legend data-i18n="speed">Speed</legend>
               <select class="setting-select" id="video-speed" name="video-speed">
-                <option value="0.25">0.25× · Super slow</option>
-                <option value="0.5">0.5× · Slow motion</option>
-                <option value="0.75">0.75× · Slight slow</option>
-                <option value="1" selected>1× · Normal</option>
-                <option value="1.5">1.5× · Quick</option>
-                <option value="2">2× · Fast forward</option>
+                <option value="0.25" data-i18n="opt_speed_025">0.25× · Super slow</option>
+                <option value="0.5" data-i18n="opt_speed_05">0.5× · Slow motion</option>
+                <option value="0.75" data-i18n="opt_speed_075">0.75× · Slight slow</option>
+                <option value="1" selected data-i18n="opt_speed_1">1× · Normal</option>
+                <option value="1.5" data-i18n="opt_speed_15">1.5× · Quick</option>
+                <option value="2" data-i18n="opt_speed_2">2× · Fast forward</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Audio track</legend>
+              <legend data-i18n="audio_track">Audio track</legend>
               <select class="setting-select" id="mp4-audio-track" name="mp4-audio-track">
-                <option value="stereo" selected>Original · Stereo</option>
-                <option value="mono">Mono · Compact</option>
-                <option value="mute">Mute · No audio</option>
+                <option value="stereo" selected data-i18n="opt_audio_stereo">Original · Stereo</option>
+                <option value="mono" data-i18n="opt_audio_mono">Mono · Compact</option>
+                <option value="mute" data-i18n="opt_audio_mute">Mute · No audio</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Color & style</legend>
+              <legend data-i18n="color_style">Color & style</legend>
               <select class="setting-select" id="mp4-color-filter" name="mp4-color-filter">
-                <option value="none" selected>Original · None</option>
-                <option value="vivid">Vivid · Punchy</option>
-                <option value="contrast">High contrast</option>
-                <option value="bw">Black & White</option>
-                <option value="warm">Cinematic warm</option>
+                <option value="none" selected data-i18n="opt_color_none">Original · None</option>
+                <option value="vivid" data-i18n="opt_color_vivid">Vivid · Punchy</option>
+                <option value="contrast" data-i18n="opt_color_contrast">High contrast</option>
+                <option value="bw" data-i18n="opt_color_bw">Black & White</option>
+                <option value="warm" data-i18n="opt_color_warm">Cinematic warm</option>
               </select>
             </fieldset>
             <fieldset class="settings-full aux-file-fieldset">
-              <legend>Subtitles & Custom Audio (optional)</legend>
+              <legend data-i18n="subtitles_audio_legend">Subtitles & Custom Audio (optional)</legend>
               <div class="aux-files-grid">
                 <div class="aux-file-box">
                   <label class="aux-file-button" for="subtitles-file" id="subtitles-label">
                     <span aria-hidden="true">&#43;</span>
-                    <span>Burn subtitles (.srt)</span>
+                    <span data-i18n="burn_subs">Burn subtitles (.srt)</span>
                     <input id="subtitles-file" name="subtitles-file" type="file" accept=".srt,.vtt" />
                   </label>
                   <span class="aux-file-status is-hidden" id="subtitles-status">
@@ -314,7 +314,7 @@
                 <div class="aux-file-box">
                   <label class="aux-file-button" for="external-audio-file" id="external-audio-label">
                     <span aria-hidden="true">&#43;</span>
-                    <span>Replace audio track</span>
+                    <span data-i18n="replace_audio">Replace audio track</span>
                     <input id="external-audio-file" name="external-audio-file" type="file" accept="audio/*,.mp3,.wav,.aac,.m4a,.ogg" />
                   </label>
                   <span class="aux-file-status is-hidden" id="external-audio-status">
@@ -327,27 +327,27 @@
           </div>
 
           <fieldset class="trim-settings">
-            <legend>Trim (optional)</legend>
+            <legend data-i18n="trim_legend">Trim (optional)</legend>
             <div class="time-grid">
               <label>
-                <span>Start time</span>
+                <span data-i18n="start_time">Start time</span>
                 <input id="trim-start" name="trim-start" type="text" inputmode="numeric" placeholder="00:00" autocomplete="off" />
               </label>
               <label>
-                <span>End time</span>
+                <span data-i18n="end_time">End time</span>
                 <input id="trim-end" name="trim-end" type="text" inputmode="numeric" placeholder="Full length" autocomplete="off" />
               </label>
             </div>
-            <p class="setting-help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
+            <p class="setting-help" data-i18n="trim_help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
           </fieldset>
 
-          <div class="mp4-note is-hidden" id="mp4-note">
+          <div class="mp4-note is-hidden" id="mp4-note" data-i18n="mp4_note">
             MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
           </div>
 
           <div class="settings-grid gif-settings is-hidden" id="gif-settings">
             <fieldset>
-              <legend>Output format</legend>
+              <legend data-i18n="output_format">Output format</legend>
               <div class="segmented-control">
                 <label>
                   <input type="radio" name="gif-output" value="gif" checked />
@@ -360,43 +360,42 @@
               </div>
             </fieldset>
             <fieldset>
-              <legend>GIF size</legend>
+              <legend data-i18n="gif_size">GIF size</legend>
               <select class="setting-select" id="gif-width" name="gif-width">
-                <option value="320">Small · 320 px</option>
-                <option value="480" selected>Balanced · 480 px</option>
-                <option value="640">Large · 640 px</option>
+                <option value="320" data-i18n="opt_gif_small">Small · 320 px</option>
+                <option value="480" selected data-i18n="opt_gif_balanced">Balanced · 480 px</option>
+                <option value="640" data-i18n="opt_gif_large">Large · 640 px</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Frame rate</legend>
+              <legend data-i18n="frame_rate">Frame rate</legend>
               <select class="setting-select" id="gif-fps" name="gif-fps">
-                <option value="8">8 FPS · smaller</option>
-                <option value="12" selected>12 FPS · balanced</option>
-                <option value="15">15 FPS · smoother</option>
+                <option value="8" data-i18n="opt_fps_8">8 FPS · smaller</option>
+                <option value="12" selected data-i18n="opt_fps_12">12 FPS · balanced</option>
+                <option value="15" data-i18n="opt_fps_15">15 FPS · smoother</option>
               </select>
             </fieldset>
             <fieldset>
-              <legend>Speed</legend>
+              <legend data-i18n="speed">Speed</legend>
               <select class="setting-select" id="gif-speed" name="gif-speed">
-                <option value="0.5">0.5× · Slow motion</option>
-                <option value="0.75">0.75× · Slight slow</option>
-                <option value="1" selected>1× · Normal</option>
-                <option value="1.5">1.5× · Quick</option>
-                <option value="2">2× · Fast</option>
+                <option value="0.5" data-i18n="opt_speed_05">0.5× · Slow motion</option>
+                <option value="0.75" data-i18n="opt_speed_075">0.75× · Slight slow</option>
+                <option value="1" selected data-i18n="opt_speed_1">1× · Normal</option>
+                <option value="1.5" data-i18n="opt_speed_15">1.5× · Quick</option>
+                <option value="2" data-i18n="opt_speed_2">2× · Fast</option>
               </select>
             </fieldset>
           </div>
 
-          <div class="gif-note is-hidden" id="gif-note">
+          <div class="gif-note is-hidden" id="gif-note" data-i18n="gif_note">
             GIF clips are limited to 15 seconds to protect browser memory. Use Trim to choose the best moment.
-            Conversion time depends on video length, resolution, and your device. Larger files may take a while — the browser is doing all the work locally.
           </div>
 
           <div class="actions">
-            <button class="primary-button" id="convert-button" type="submit">
+            <button class="primary-button" id="convert-button" type="submit" data-i18n="btn_convert_audio">
               Convert to audio
             </button>
-            <button class="cancel-button is-hidden" id="cancel-button" type="button">
+            <button class="cancel-button is-hidden" id="cancel-button" type="button" data-i18n="btn_cancel">
               Cancel conversion
             </button>
           </div>
@@ -404,13 +403,13 @@
           <section class="results-panel is-hidden" id="results-panel" aria-live="polite">
             <div class="results-heading">
               <div>
-                <p class="file-label">Completed files</p>
-                <h2>Ready to download</h2>
-                <p class="results-hint" id="results-hint">Your files are ready. Use the download buttons below to save them to your device.</p>
+                <p class="file-label" data-i18n="completed_files">Completed files</p>
+                <h2 data-i18n="ready_to_download">Ready to download</h2>
+                <p class="results-hint" id="results-hint" data-i18n="results_hint">Your files are ready. Use the download buttons below to save them to your device.</p>
               </div>
               <div class="results-tools">
                 <span id="results-summary"></span>
-                <button class="download-all-button is-hidden" id="download-all" type="button">Download all</button>
+                <button class="download-all-button is-hidden" id="download-all" type="button" data-i18n="download_all">Download all</button>
               </div>
             </div>
             <div class="results-list" id="results-list"></div>
@@ -420,7 +419,7 @@
             <div class="progress-track" aria-hidden="true">
               <div class="progress-bar" id="progress-bar"></div>
             </div>
-            <p id="status-message">Choose a video to get started.</p>
+            <p id="status-message" data-i18n="status_ready">Choose a video to get started.</p>
             <p class="error-message is-hidden" id="error-message"></p>
           </div>
         </form>
@@ -435,12 +434,12 @@
     <div class="floating-controls">
       <button class="history-floating-button" id="history-toggle" type="button" aria-label="View conversion history and savings" title="View conversion history and savings">
         <span aria-hidden="true">&#8801;</span>
-        <span class="history-badge" id="history-badge">History</span>
+        <span class="history-badge" id="history-badge" data-i18n="history_button">History</span>
       </button>
 
       <button class="reset-floating-button" id="reset-defaults" type="button" aria-label="Restore all default settings" title="Restore all default settings">
         <span aria-hidden="true">&#8634;</span>
-        Reset
+        <span data-i18n="reset_button">Reset</span>
       </button>
     </div>
 

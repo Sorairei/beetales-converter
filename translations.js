@@ -1,8 +1,10 @@
 export const translations = {
   en: {
+    app_tagline: "Local media tools",
+    app_title_heading: "Media Converter",
     app_title_badge: "BETA BUILD",
     app_title: "The BeeTales Media Converter",
-    app_lead: "Convert WebM and video clips to high-bitrate MP3, WAV, AAC, MP4, or animated GIF/WebP directly in your browser.",
+    app_lead: "Extract audio, optimize MP4, or turn a video clip into GIF directly in your browser.",
     privacy_title: "Private by design",
     privacy_desc: "Your files never leave this device. No uploads, accounts, or document server.",
     privacy_b1: "100% local",
@@ -27,6 +29,20 @@ export const translations = {
 
     drop_title: "Select one or more video files",
     drop_hint: "You can also drag and drop them here",
+    drop_title_audio: "Select one or more video files",
+    drop_hint_audio: "You can also drag and drop them here",
+    drop_title_mp4: "Select WebM or MP4 videos",
+    drop_hint_mp4: "Drop .webm or .mp4 files here or choose them from your device",
+    drop_title_gif: "Select videos for GIF",
+    drop_hint_gif: "Choose a short clip with Trim for the best result",
+
+    busy_audio: "Extracting audio...",
+    busy_mp4: "Converting to MP4...",
+    busy_gif: "Creating GIF...",
+    ready_audio: "video(s) ready for audio extraction.",
+    ready_mp4: "video(s) ready for MP4 conversion or optimization.",
+    ready_gif: "video(s) ready for GIF creation.",
+
     queue_label: "Conversion queue",
     clear_button: "Clear",
     preview_label: "Preview",
@@ -105,6 +121,7 @@ export const translations = {
     history_title: "Conversion History & Space Savings",
     clear_history: "Clear history",
     no_history: "No conversions recorded yet. Converted files will appear here along with space savings.",
+    saved_history_badge: "saved",
 
     // Guide Modal
     guide_title: "BeeTales Converter — User Guide & Manual",
@@ -157,9 +174,11 @@ export const translations = {
   },
 
   es: {
+    app_tagline: "Herramientas multimedia locales",
+    app_title_heading: "Convertidor Multimedia",
     app_title_badge: "VERSIÓN BETA",
     app_title: "Convertidor Multimedia BeeTales",
-    app_lead: "Convierte clips WebM y videos a MP3 de alto bitrate, WAV, AAC, MP4 o GIF/WebP animados directamente en tu navegador.",
+    app_lead: "Extrae audio, optimiza MP4 o convierte clips de video a GIF directamente en tu navegador.",
     privacy_title: "Privado por diseño",
     privacy_desc: "Tus archivos nunca salen de este dispositivo. Sin subidas a servidores, cuentas ni registros.",
     privacy_b1: "100% local",
@@ -184,6 +203,20 @@ export const translations = {
 
     drop_title: "Selecciona uno o más archivos de video",
     drop_hint: "También puedes arrastrarlos y soltarlos aquí",
+    drop_title_audio: "Selecciona uno o más archivos de video",
+    drop_hint_audio: "También puedes arrastrarlos y soltarlos aquí",
+    drop_title_mp4: "Selecciona videos WebM o MP4",
+    drop_hint_mp4: "Suelta archivos .webm o .mp4 aquí o elígelos de tu dispositivo",
+    drop_title_gif: "Selecciona videos para crear GIF",
+    drop_hint_gif: "Elige un clip corto con Recorte para obtener el mejor resultado",
+
+    busy_audio: "Extrayendo audio...",
+    busy_mp4: "Convirtiendo a MP4...",
+    busy_gif: "Creando GIF...",
+    ready_audio: "video(s) listos para extraer audio.",
+    ready_mp4: "video(s) listos para optimizar o convertir a MP4.",
+    ready_gif: "video(s) listos para crear GIF animado.",
+
     queue_label: "Cola de conversión",
     clear_button: "Limpiar",
     preview_label: "Vista previa",
@@ -262,6 +295,7 @@ export const translations = {
     history_title: "Historial de Conversión y Ahorro de Espacio",
     clear_history: "Limpiar historial",
     no_history: "Aún no hay conversiones registradas. Los archivos convertidos aparecerán aquí junto con el ahorro de espacio.",
+    saved_history_badge: "ahorrados",
 
     // Guide Modal
     guide_title: "Convertidor BeeTales — Guía de Usuario y Manual",
@@ -314,9 +348,11 @@ export const translations = {
   },
 
   pt: {
+    app_tagline: "Ferramentas multimídia locais",
+    app_title_heading: "Conversor Multimídia",
     app_title_badge: "VERSÃO BETA",
     app_title: "Conversor Multimídia BeeTales",
-    app_lead: "Converta vídeos WebM e clipes para MP3 de alta taxa de bits, WAV, AAC, MP4 ou GIF/WebP animados diretamente no seu navegador.",
+    app_lead: "Extraia áudio, otimize MP4 ou transforme vídeos em GIFs diretamente no seu navegador.",
     privacy_title: "Privacidade por design",
     privacy_desc: "Seus arquivos nunca saem deste dispositivo. Sem uploads para servidores, contas ou registros.",
     privacy_b1: "100% local",
@@ -341,6 +377,20 @@ export const translations = {
 
     drop_title: "Selecione um ou mais arquivos de vídeo",
     drop_hint: "Você também pode arrastá-los e soltá-los aqui",
+    drop_title_audio: "Selecione um ou mais arquivos de vídeo",
+    drop_hint_audio: "Você também pode arrastá-los e soltá-los aqui",
+    drop_title_mp4: "Selecione vídeos WebM ou MP4",
+    drop_hint_mp4: "Solte arquivos .webm ou .mp4 aqui ou escolha-os do seu dispositivo",
+    drop_title_gif: "Selecione vídeos para criar GIF",
+    drop_hint_gif: "Escolha um clipe curto com Corte para obter o melhor resultado",
+
+    busy_audio: "Extraindo áudio...",
+    busy_mp4: "Convertendo para MP4...",
+    busy_gif: "Criando GIF...",
+    ready_audio: "vídeo(s) prontos para extração de áudio.",
+    ready_mp4: "vídeo(s) prontos para otimização ou conversão para MP4.",
+    ready_gif: "vídeo(s) prontos para criação de GIF animado.",
+
     queue_label: "Fila de conversão",
     clear_button: "Limpar",
     preview_label: "Pré-visualização",
@@ -419,6 +469,7 @@ export const translations = {
     history_title: "Histórico de Conversão e Economia de Espaço",
     clear_history: "Limpar histórico",
     no_history: "Nenhuma conversão gravada ainda. Arquivos convertidos aparecerão aqui junto com o espaço economizado.",
+    saved_history_badge: "economizados",
 
     // Guide Modal
     guide_title: "Conversor BeeTales — Guia do Usuário e Manual",
@@ -471,9 +522,11 @@ export const translations = {
   },
 
   pl: {
+    app_tagline: "Lokalne narzędzia multimedialne",
+    app_title_heading: "Konwerter Multimedialny",
     app_title_badge: "WERSJA BETA",
     app_title: "Konwerter Multimedialny BeeTales",
-    app_lead: "Konwertuj pliki WebM i wideo na wysokiej jakości MP3, WAV, AAC, MP4 lub animowane GIF/WebP bezpośrednio w przeglądarce.",
+    app_lead: "Wyodrębniaj dźwięk, optymalizuj MP4 lub twórz animacje GIF bezpośrednio w przeglądarce.",
     privacy_title: "Prywatność z założenia",
     privacy_desc: "Twoje pliki nigdy nie opuszczają tego urządzenia. Bez przesyłania na serwery, kont czy rejestracji.",
     privacy_b1: "100% lokalnie",
@@ -498,6 +551,20 @@ export const translations = {
 
     drop_title: "Wybierz jeden lub więcej plików wideo",
     drop_hint: "Możesz także przeciągnąć i upuścić je tutaj",
+    drop_title_audio: "Wybierz jeden lub więcej plików wideo",
+    drop_hint_audio: "Możesz także przeciągnąć i upuścić je tutaj",
+    drop_title_mp4: "Wybierz pliki WebM lub MP4",
+    drop_hint_mp4: "Upuść pliki .webm lub .mp4 tutaj lub wybierz je z urządzenia",
+    drop_title_gif: "Wybierz wideo do utworzenia GIF",
+    drop_hint_gif: "Wybierz krótki fragment z Przycinaniem, aby uzyskać najlepszy efekt",
+
+    busy_audio: "Wyodrębnianie dźwięku...",
+    busy_mp4: "Konwertowanie na MP4...",
+    busy_gif: "Tworzenie GIF...",
+    ready_audio: "plik(i) gotowe do wyodrębnienia dźwięku.",
+    ready_mp4: "plik(i) gotowe do optymalizacji lub konwersji na MP4.",
+    ready_gif: "plik(i) gotowe do utworzenia animacji GIF.",
+
     queue_label: "Kolejka konwersji",
     clear_button: "Wyczyść",
     preview_label: "Podgląd",
@@ -576,6 +643,7 @@ export const translations = {
     history_title: "Historia Konwersji i Zaoszczędzone Miejsce",
     clear_history: "Wyczyść historię",
     no_history: "Brak zapisanych konwersji. Przekonwertowane pliki pojawią się tutaj wraz z zaoszczędzonym miejscem.",
+    saved_history_badge: "zaoszczędzono",
 
     // Guide Modal
     guide_title: "Konwerter BeeTales — Podręcznik i Pomoc",

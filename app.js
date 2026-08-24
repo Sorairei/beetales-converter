@@ -1670,6 +1670,7 @@ function recordConversionHistory(entry) {
 }
 
 function updateHistoryBadge() {
+  const dict = translations[currentLang] || translations.en;
   const history = loadHistoryFromStorage();
   let totalSaved = 0;
   history.forEach((h) => {
@@ -1678,7 +1679,9 @@ function updateHistoryBadge() {
     }
   });
   if (historyBadge) {
-    historyBadge.textContent = history.length ? `${formatBytes(totalSaved)} saved` : "History";
+    historyBadge.textContent = history.length
+      ? `${formatBytes(totalSaved)} ${dict.saved_history_badge || "saved"}`
+      : (dict.history_button || "History");
   }
 }
 
@@ -1763,12 +1766,13 @@ function savePresetsToStorage(presets) {
 }
 
 function renderPresets() {
+  const dict = translations[currentLang] || translations.en;
   const presets = loadPresetsFromStorage();
   presetsList.replaceChildren();
   if (!presets.length) {
     const hint = document.createElement("span");
     hint.className = "presets-empty-hint";
-    hint.textContent = "No saved presets yet";
+    hint.textContent = dict.no_presets || "No saved presets yet";
     presetsList.appendChild(hint);
     return;
   }
@@ -1994,7 +1998,7 @@ function setLanguage(lang) {
   if (languageSelect) languageSelect.value = lang;
   try { localStorage.setItem(LANG_KEY, lang); } catch {}
 
-  const dict = translations[lang];
+  const dict = translations[lang] || translations.en;
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     if (dict[key]) {
@@ -2005,6 +2009,7 @@ function setLanguage(lang) {
   if (presetNameInput) presetNameInput.placeholder = dict.preset_name_placeholder || "Preset name…";
 
   updateLocalizedModeContent();
+  updateModeUI({ resetFiles: false });
   updateHistoryBadge();
   renderPresets();
 }
@@ -2014,16 +2019,26 @@ function updateLocalizedModeContent() {
   if (modeContent.audio) {
     modeContent.audio.button = dict.btn_convert_audio || "Convert to audio";
     modeContent.audio.empty = dict.status_ready || "Choose a video to get started.";
-    modeContent.audio.dropTitle = dict.drop_title || "Select one or more video files";
-    modeContent.audio.dropHint = dict.drop_hint || "You can also drag and drop them here";
+    modeContent.audio.dropTitle = dict.drop_title_audio || dict.drop_title || "Select one or more video files";
+    modeContent.audio.dropHint = dict.drop_hint_audio || dict.drop_hint || "You can also drag and drop them here";
+    modeContent.audio.busy = dict.busy_audio || "Extracting audio...";
+    modeContent.audio.ready = dict.ready_audio || "video(s) ready for audio extraction.";
   }
   if (modeContent.mp4) {
     modeContent.mp4.button = dict.btn_convert_mp4 || "Convert to MP4";
     modeContent.mp4.empty = dict.status_ready || "Choose a video to get started.";
+    modeContent.mp4.dropTitle = dict.drop_title_mp4 || "Select WebM or MP4 videos";
+    modeContent.mp4.dropHint = dict.drop_hint_mp4 || "Drop .webm or .mp4 files here or choose them from your device";
+    modeContent.mp4.busy = dict.busy_mp4 || "Converting to MP4...";
+    modeContent.mp4.ready = dict.ready_mp4 || "video(s) ready for MP4 conversion or optimization.";
   }
   if (modeContent.gif) {
     modeContent.gif.button = dict.btn_convert_gif || "Convert to GIF";
     modeContent.gif.empty = dict.status_ready || "Choose a video to get started.";
+    modeContent.gif.dropTitle = dict.drop_title_gif || "Select videos for GIF";
+    modeContent.gif.dropHint = dict.drop_hint_gif || "Choose a short clip with Trim for the best result";
+    modeContent.gif.busy = dict.busy_gif || "Creating GIF...";
+    modeContent.gif.ready = dict.ready_gif || "video(s) ready for GIF creation.";
   }
 }
 

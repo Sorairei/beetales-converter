@@ -496,7 +496,11 @@ function cancelConversion() {
 }
 
 function showPreview(file) {
-  resetPreview();
+  try {
+    resetPreview();
+  } catch (e) {
+    console.warn("resetPreview failed:", e);
+  }
   if (!file) return;
   previewUrl = URL.createObjectURL(file);
   videoPreview.src = previewUrl;
@@ -532,7 +536,8 @@ function resetPreview() {
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
   saveFrameBar.classList.add("is-hidden");
-  if (dynamicSubtitleOverlay) dynamicSubtitleOverlay.classList.add("is-hidden");
+  const subtitleOverlay = typeof dynamicSubtitleOverlay !== "undefined" ? dynamicSubtitleOverlay : null;
+  if (subtitleOverlay) subtitleOverlay.classList.add("is-hidden");
 }
 
 function loadMediaMetadata(file) {

@@ -223,7 +223,7 @@ ffmpeg.on("progress", ({ progress }) => {
 });
 
 fileInput.addEventListener("change", () => handleFiles(fileInput.files));
-modeInputs.forEach((input) => input.addEventListener("change", () => updateModeUI({ resetFiles: true })));
+modeInputs.forEach((input) => input.addEventListener("change", () => updateModeUI({ resetFiles: false })));
 preferenceInputs.forEach((input) => input.addEventListener("change", savePreferences));
 dropZone.addEventListener("dragover", (event) => {
   event.preventDefault();
@@ -998,12 +998,26 @@ function updateModeUI({ resetFiles }) {
     cropActions.classList.remove("is-hidden");
   } else {
     cropActions.classList.add("is-hidden");
-    resetCrop();
+    if (!isGif) resetCrop();
   }
 
-  if (resetFiles) clearSelection();
+  if (resetFiles && selectedFiles.length === 0) {
+    clearSelection();
+  }
+
+  if (selectedFiles.length && previewPanel.classList.contains("is-hidden")) {
+    showPreview(selectedFiles[0]);
+  }
+
+  if (isGif && selectedFiles.length && !timelineReady) {
+    thumbnailImages = [];
+    timelineReady = false;
+    waveformReady = false;
+    generateThumbnails(selectedFiles[0]).catch(() => {});
+  }
+
   setBusy(false);
-  setStatus(modeContent[mode].empty);
+  setStatus(selectedFiles.length ? `${selectedFiles.length} ${modeContent[mode].ready}` : modeContent[mode].empty);
 
   if (!previewPanel.classList.contains("is-hidden") && mode !== "audio") {
     saveFrameBar.classList.remove("is-hidden");

@@ -11,22 +11,6 @@ import {
   safeBaseName,
 } from "./converter-utils.js";
 import { translations } from "./translations.js";
-import {
-  SUBTITLE_PRESETS,
-  splitLyricsIntoWords,
-  exportAss,
-  exportSrt,
-  exportLrc,
-  parseLrc,
-  parseSrt,
-  KaraokeSyncEngine,
-  autoAlignLyricsWithAudio,
-  alignLyricsWithWhisperChunks,
-  transcribeWithWhisperAI,
-  shiftTimestamps,
-  drawKaraokeSubtitlesOnCanvas,
-  drawAudioVisualizerBackground,
-} from "./karaoke-sync.js";
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#converter-form");
@@ -65,7 +49,7 @@ const resultsSummary = $("#results-summary");
 const downloadAllButton = $("#download-all");
 const resetDefaultsButton = $("#reset-defaults");
 const modeInputs = document.querySelectorAll('input[name="mode"]');
-const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed, #mp4-audio-track, #mp4-color-filter, #karaoke-font-family, #karaoke-font-size, #karaoke-primary-color, #karaoke-active-color, #karaoke-position, #karaoke-uppercase');
+const preferenceInputs = document.querySelectorAll('input[name="mode"], input[name="format"], input[name="bitrate"], input[name="gif-output"], input[name="loudness-normalize"], #video-quality, #video-resolution, #gif-width, #gif-fps, #video-speed, #gif-speed, #mp4-audio-track, #mp4-color-filter');
 
 const cropContainer = $("#crop-container");
 const cropOverlay = $("#crop-overlay");
@@ -131,44 +115,7 @@ const guideCloseBtn = $("#guide-close-btn");
 const guideTabs = document.querySelectorAll(".guide-tab-button");
 const guidePanes = document.querySelectorAll(".guide-pane");
 
-// Karaoke & Dynamic Subtitles DOM refs
-const karaokeSettings = $("#karaoke-settings");
-const karaokeNote = $("#karaoke-note");
-const karaokeTabPaste = $("#karaoke-tab-paste");
-const karaokeTabImport = $("#karaoke-tab-import");
-const karaokePanelPaste = $("#karaoke-panel-paste");
-const karaokePanelImport = $("#karaoke-panel-import");
-const karaokeLyricsInput = $("#karaoke-lyrics-input");
-const karaokeWordsPerBlock = $("#karaoke-words-per-block");
-const karaokePrepareBtn = $("#karaoke-prepare-btn");
-const karaokeAutoSyncBtn = $("#karaoke-auto-sync-btn");
-const karaokeFileInput = $("#karaoke-file-input");
-const karaokeWordsQueue = $("#karaoke-words-queue");
-const karaokeDspSyncBtn = $("#karaoke-dsp-sync-btn");
-const karaokeTapBtn = $("#karaoke-tap-btn");
-const karaokeUndoBtn = $("#karaoke-undo-btn");
-const karaokeResetBtn = $("#karaoke-reset-btn");
-const karaokeOffsetMinus = $("#karaoke-offset-minus");
-const karaokeOffsetPlus = $("#karaoke-offset-plus");
-const karaokeSyncCounter = $("#karaoke-sync-counter");
-const karaokePresetCards = document.querySelectorAll(".karaoke-preset-card");
-const karaokeFontFamily = $("#karaoke-font-family");
-const karaokeFontSize = $("#karaoke-font-size");
-const karaokePrimaryColor = $("#karaoke-primary-color");
-const karaokeActiveColor = $("#karaoke-active-color");
-const karaokePosition = $("#karaoke-position");
-const karaokeUppercase = $("#karaoke-uppercase");
-const karaokeDlLrc = $("#karaoke-dl-lrc");
-const karaokeDlSrt = $("#karaoke-dl-srt");
-const karaokeDlAss = $("#karaoke-dl-ass");
-const dynamicSubtitleOverlay = $("#dynamic-subtitle-overlay");
-const dynamicSubtitleBox = $("#dynamic-subtitle-box");
 const audioVisualizerCanvas = $("#audio-visualizer-canvas");
-const karaokeAiBanner = $("#karaoke-ai-banner");
-const karaokeAiStatusLabel = $("#karaoke-ai-status-label");
-const karaokeAiDesc = $("#karaoke-ai-desc");
-const karaokeAiProgressBar = $("#karaoke-ai-progress-bar");
-const karaokeAiProgressFill = $("#karaoke-ai-progress-fill");
 
 const LANG_KEY = "beetales-lang-v1";
 let currentLang = localStorage.getItem(LANG_KEY) || "en";
@@ -216,10 +163,6 @@ let trimOverlayDragStartRange = null;
 let cachedAccentColor = "#91bd59";
 let decodeAbortController = null;
 let thumbnailAbortToken = 0;
-
-// Karaoke Sync Engine Instance
-const karaokeEngine = new KaraokeSyncEngine();
-let activePresetId = "tiktok";
 
 const FFMPEG_LOAD_TIMEOUT_MS = 60000;
 const PREFERENCES_KEY = "beetales-converter-preferences-v1";
@@ -269,16 +212,6 @@ const modeContent = {
     accept: "video/*,.webm,.mp4",
     download: "Download GIF",
   },
-  karaoke: {
-    button: "Burn & Export MP4",
-    busy: "Generating subtitled video...",
-    ready: "video(s) ready for subtitle creation & burning.",
-    empty: "Select video or audio to start Karaoke & Subtitles.",
-    dropTitle: "Select video or audio for Karaoke / Subtitles",
-    dropHint: "Upload your video or song, then paste lyrics below to sync",
-    accept: "video/*,audio/*,.webm,.mp4,.mp3,.wav,.m4a,.ogg",
-    download: "Download Subtitled MP4",
-  },
 };
 
 ffmpeg.on("progress", ({ progress }) => {
@@ -322,11 +255,6 @@ trimEnd.addEventListener("input", handleTrimInputChange);
 videoPreview.addEventListener("timeupdate", () => {
   if (timelineReady) drawTimeline();
   if (waveformReady) drawWaveform();
-  if (getMode() === "karaoke") updateSubtitleOverlay();
-});
-
-videoPreview.addEventListener("seeked", () => {
-  if (getMode() === "karaoke") updateSubtitleOverlay();
 });
 
 videoPreview.addEventListener("play", () => {
@@ -342,7 +270,6 @@ videoPreview.addEventListener("ended", () => {
 });
 
 // Initialize sub-modules
-initKaraokeStudio();
 restorePreferences();
 applyUrlParams();
 setLanguage(currentLang);
@@ -386,7 +313,7 @@ async function handleFiles(fileCollection) {
   if (audioContext) { try { audioContext.close(); } catch {} audioContext = null; }
   audioBuffer = null;
   if (currentMode === "gif" && selectedFiles[0]) generateThumbnails(selectedFiles[0]);
-  if ((currentMode === "audio" || currentMode === "karaoke") && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
+  if (currentMode === "audio" && selectedFiles[0]) decodeAudio(selectedFiles[0]).catch(() => {});
 }
 
 let draggedIndex = null;
@@ -496,11 +423,6 @@ async function convertQueue() {
     return;
   }
 
-  if (mode === "karaoke" && !karaokeEngine.words.some((w) => w.start !== null)) {
-    showError("Please sync at least one word in the Lyrics Studio before exporting.");
-    return;
-  }
-
   const trim = getTrimSettings();
   if (trim.error) {
     showError(trim.error);
@@ -587,7 +509,6 @@ function showPreview(file) {
     if (isAudio) renderAudioVisualizerFrame();
   }
   if (getMode() !== "audio") saveFrameBar.classList.remove("is-hidden");
-  if (getMode() === "karaoke") dynamicSubtitleOverlay.classList.remove("is-hidden");
 }
 
 function resetPreview() {
@@ -686,192 +607,15 @@ function getTrimRangeError(trim) {
   return "";
 }
 
-async function burnKaraokeVideo(file, words, style, trim, index) {
-  const token = `${Date.now()}-${index}`;
-  const recName = `rec-${token}.webm`;
-  const outputName = getOutputName(file.name, "karaoke");
-  const isAudio = isAudioFile(file);
-  const metadata = fileMetadata.get(file);
-  const fileDuration = metadata?.duration || videoPreview.duration || 30;
-
-  const startSec = trim?.start || 0;
-  const endSec = trim?.end !== undefined ? trim.end : fileDuration;
-  const clipDuration = Math.max(1, endSec - startSec);
-
-  const width = 1280;
-  const height = 720;
-  const fps = 30;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-
-  const mediaEl = document.createElement(isAudio ? "audio" : "video");
-  mediaEl.playsInline = true;
-  mediaEl.muted = false;
-  mediaEl.crossOrigin = "anonymous";
-  const mediaUrl = URL.createObjectURL(file);
-  mediaEl.src = mediaUrl;
-
-  await new Promise((resolve) => {
-    mediaEl.onloadedmetadata = () => resolve();
-    mediaEl.onerror = () => resolve();
-    setTimeout(resolve, 3000);
-  });
-
-  const canvasStream = canvas.captureStream(fps);
-
-  let audioCtx = null;
-  let combinedStream = canvasStream;
-
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaElementSource(mediaEl);
-    const dest = audioCtx.createMediaStreamDestination();
-    source.connect(dest);
-    combinedStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...dest.stream.getAudioTracks(),
-    ]);
-  } catch (err) {
-    console.warn("AudioContext stream routing fallback:", err);
-  }
-
-  let mimeType = "video/webm;codecs=vp9,opus";
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm;codecs=vp8,opus";
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm";
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "";
-
-  const chunks = [];
-  const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType, videoBitsPerSecond: 6000000 } : {});
-  recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) chunks.push(e.data);
-  };
-
-  const recordPromise = new Promise((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType || "video/webm" }));
-  });
-
-  recorder.start(100);
-
-  let isRunning = true;
-  mediaEl.currentTime = startSec;
-  await mediaEl.play().catch(() => {});
-
-  const renderLoop = () => {
-    if (!isRunning) return;
-    const curTime = mediaEl.currentTime || 0;
-
-    ctx.clearRect(0, 0, width, height);
-
-    if (isAudio) {
-      drawAudioVisualizerBackground(ctx, width, height, curTime);
-    } else {
-      if (mediaEl.readyState >= 2) {
-        ctx.drawImage(mediaEl, 0, 0, width, height);
-      } else {
-        ctx.fillStyle = "#040c06";
-        ctx.fillRect(0, 0, width, height);
-      }
-    }
-
-    drawKaraokeSubtitlesOnCanvas(ctx, width, height, curTime, words, style);
-
-    const progress = Math.min(99, Math.round(((curTime - startSec) / clipDuration) * 100));
-    setProgress(progress);
-    setStatus(`Rendering & burning subtitles into MP4... ${progress}%`);
-
-    if (curTime < endSec && !mediaEl.ended && !cancelRequested) {
-      requestAnimationFrame(renderLoop);
-    }
-  };
-
-  requestAnimationFrame(renderLoop);
-
-  await new Promise((resolve) => {
-    mediaEl.onended = () => resolve();
-    mediaEl.ontimeupdate = () => {
-      if (mediaEl.currentTime >= endSec - 0.05 || cancelRequested) resolve();
-    };
-    setTimeout(resolve, (clipDuration + 5) * 1000);
-  });
-
-  isRunning = false;
-  mediaEl.pause();
-  recorder.stop();
-  const recordedBlob = await recordPromise;
-
-  if (audioCtx) {
-    try { await audioCtx.close(); } catch {}
-  }
-  URL.revokeObjectURL(mediaUrl);
-
-  if (cancelRequested) throw new Error("conversion-cancelled");
-
-  setStatus("Finalizing H.264 MP4 export...");
-
-  let wroteInput = false;
-  let wroteOutput = false;
-  try {
-    await ffmpeg.writeFile(recName, await fetchFile(recordedBlob));
-    wroteInput = true;
-
-    const ffmpegArgs = [
-      "-hide_banner",
-      "-y",
-      "-i", recName,
-      "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-crf", "22",
-      "-c:a", "aac",
-      "-b:a", "192k",
-      "-pix_fmt", "yuv420p",
-      "-movflags", "+faststart",
-      "-f", "mp4",
-      outputName,
-    ];
-
-    const exitCode = await ffmpeg.exec(ffmpegArgs);
-    if (exitCode !== 0) throw new Error(`ffmpeg-exit-${exitCode}`);
-    wroteOutput = true;
-
-    const data = await ffmpeg.readFile(outputName);
-    if (!data?.length) throw new Error("empty-output");
-
-    const finalBlob = new Blob([data], { type: "video/mp4" });
-    const url = URL.createObjectURL(finalBlob);
-    resultUrls.push(url);
-
-    recordConversionHistory({
-      name: file.name,
-      outputName,
-      mode: "karaoke",
-      inputSize: file.size,
-      outputSize: finalBlob.size,
-      timestamp: Date.now(),
-    });
-
-    return { file, outputName, outputSize: finalBlob.size, url };
-  } finally {
-    await cleanupFiles(
-      ...(wroteInput ? [recName] : []),
-      ...(wroteOutput ? [outputName] : [])
-    );
-  }
-}
-
 async function convertFile(file, mode, index, trim) {
   if (mode === "gif" && getGifOutputExtension() === "webp") return convertToWebP(file, index, trim);
   const token = `${Date.now()}-${index}`;
   const inputName = `input-${token}.${getFileExtension(file.name) || "video"}`;
   const srtName = `subs-${token}.srt`;
-  const assName = `subs-${token}.ass`;
   const extAudioName = selectedExternalAudioFile ? `extaudio-${token}.${getFileExtension(selectedExternalAudioFile.name) || "mp3"}` : null;
   const outputName = getOutputName(file.name, mode);
   let wroteInput = false;
   let wroteSrt = false;
-  let wroteAss = false;
   let wroteExtAudio = false;
   let wroteOutput = false;
   try {
@@ -888,9 +632,7 @@ async function convertFile(file, mode, index, trim) {
     }
 
     let initialArgs;
-    if (mode === "karaoke") {
-      return await burnKaraokeVideo(file, karaokeEngine.words, getActiveKaraokeStyle(), trim, index);
-    } else if (mode === "mp4") {
+    if (mode === "mp4") {
       initialArgs = getMp4Args(inputName, outputName, "h264", trim, wroteSrt ? srtName : null, wroteExtAudio ? extAudioName : null);
     } else if (mode === "gif") {
       initialArgs = getGifArgs(inputName, outputName, trim);
@@ -1163,13 +905,6 @@ function savePreferences() {
     loudness: loudnessNormalize?.checked ?? false,
     mp4Audio: mp4AudioTrack?.value ?? "stereo",
     mp4Filter: mp4ColorFilter?.value ?? "none",
-    karaokePreset: activePresetId,
-    karaokeFont: karaokeFontFamily?.value,
-    karaokeSize: karaokeFontSize?.value,
-    karaokeColor: karaokePrimaryColor?.value,
-    karaokeActiveColor: karaokeActiveColor?.value,
-    karaokePos: karaokePosition?.value,
-    karaokeUpper: karaokeUppercase?.checked ?? true,
   };
   try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)); } catch { /* Storage may be disabled. */ }
 }
@@ -1191,13 +926,6 @@ function restorePreferences() {
     if (loudnessNormalize && preferences.loudness !== undefined) loudnessNormalize.checked = !!preferences.loudness;
     if (mp4AudioTrack && preferences.mp4Audio) setSelectValue(mp4AudioTrack, preferences.mp4Audio);
     if (mp4ColorFilter && preferences.mp4Filter) setSelectValue(mp4ColorFilter, preferences.mp4Filter);
-    if (preferences.karaokePreset) applyKaraokePreset(preferences.karaokePreset);
-    if (karaokeFontFamily && preferences.karaokeFont) setSelectValue(karaokeFontFamily, preferences.karaokeFont);
-    if (karaokeFontSize && preferences.karaokeSize) setSelectValue(karaokeFontSize, preferences.karaokeSize);
-    if (karaokePrimaryColor && preferences.karaokeColor) karaokePrimaryColor.value = preferences.karaokeColor;
-    if (karaokeActiveColor && preferences.karaokeActiveColor) karaokeActiveColor.value = preferences.karaokeActiveColor;
-    if (karaokePosition && preferences.karaokePos) setSelectValue(karaokePosition, preferences.karaokePos);
-    if (karaokeUppercase && preferences.karaokeUpper !== undefined) karaokeUppercase.checked = preferences.karaokeUpper;
   } catch { /* Invalid or unavailable storage falls back to defaults. */ }
 }
 
@@ -1227,13 +955,6 @@ function restoreAllDefaults() {
   trimStart.value = "";
   trimEnd.value = "";
 
-  // Reset Karaoke
-  karaokeEngine.resetSync();
-  karaokeEngine.setWords([]);
-  applyKaraokePreset("tiktok");
-  if (karaokeLyricsInput) karaokeLyricsInput.value = "";
-  renderWordChipsQueue();
-
   try { localStorage.removeItem(PREFERENCES_KEY); } catch { /* Storage may be disabled. */ }
   resetCrop();
   cropActions.classList.add("is-hidden");
@@ -1262,17 +983,12 @@ function updateModeUI({ resetFiles }) {
   const mode = getMode();
   const isMp4 = mode === "mp4";
   const isGif = mode === "gif";
-  const isKaraoke = mode === "karaoke";
 
   audioSettings.classList.toggle("is-hidden", mode !== "audio");
   mp4Settings.classList.toggle("is-hidden", !isMp4);
   mp4Note.classList.toggle("is-hidden", !isMp4);
   gifSettings.classList.toggle("is-hidden", !isGif);
   gifNote.classList.toggle("is-hidden", !isGif);
-
-  if (karaokeSettings) karaokeSettings.classList.toggle("is-hidden", !isKaraoke);
-  if (karaokeNote) karaokeNote.classList.toggle("is-hidden", !isKaraoke);
-  if (dynamicSubtitleOverlay) dynamicSubtitleOverlay.classList.toggle("is-hidden", !isKaraoke);
 
   fileInput.accept = modeContent[mode].accept;
   dropTitle.textContent = modeContent[mode].dropTitle;
@@ -1323,14 +1039,13 @@ function getFriendlyError(error, mode) {
   if (message.includes("empty-output")) return "No output file was generated.";
   if (mode === "gif") return `This video could not be converted to ${getGifOutputExtension().toUpperCase()}. Try a shorter clip or smaller size.`;
   if (message.includes("ffmpeg-exit") || message.includes("audio") || message.includes("stream") || message.includes("map")) {
-    return mode === "mp4" || mode === "karaoke" ? "This video could not be converted or subtitled." : "No compatible audio track was found.";
+    return mode === "mp4" ? "This video could not be converted or subtitled." : "No compatible audio track was found.";
   }
-  return mode === "mp4" || mode === "karaoke" ? "This video could not be converted." : "This media file could not be converted.";
+  return mode === "mp4" ? "This video could not be converted." : "This media file could not be converted.";
 }
 
 function getValidationMessage(mode) {
   if (mode === "mp4") return "Please select one or more .webm or .mp4 video files.";
-  if (mode === "karaoke") return "Please select a video or audio file for Karaoke/Subtitles.";
   return "The selected files do not appear to be compatible media files.";
 }
 
@@ -1338,7 +1053,6 @@ function getCheckedValue(name) { return document.querySelector(`input[name="${na
 function getMode() { return getCheckedValue("mode"); }
 function isValidFileForMode(file, mode) {
   if (mode === "mp4") return isMp4SourceFile(file);
-  if (mode === "karaoke") return isVideoFile(file) || isAudioFile(file);
   return isVideoFile(file);
 }
 
@@ -1356,15 +1070,12 @@ function getOutputName(name, mode) {
     const ext = getGifOutputExtension();
     return `${safeBaseName(name)}-clip.${ext}`;
   }
-  if (mode === "karaoke") {
-    return `${safeBaseName(name)}-subtitled.mp4`;
-  }
   const suffix = mode === "mp4" && getFileExtension(name) === "mp4" ? "-optimized" : "";
   return `${safeBaseName(name)}${suffix}.${getOutputExtension(mode)}`;
 }
 
 function getOutputExtension(mode) {
-  if (mode === "mp4" || mode === "karaoke") return "mp4";
+  if (mode === "mp4") return "mp4";
   if (mode === "gif") return getGifOutputExtension();
   return getCheckedValue("format");
 }
@@ -2227,13 +1938,6 @@ function confirmSavePreset() {
     loudness:    loudnessNormalize?.checked ?? false,
     mp4Audio:    mp4AudioTrack?.value ?? "stereo",
     mp4Filter:   mp4ColorFilter?.value ?? "none",
-    karaokePreset: activePresetId,
-    karaokeFont: karaokeFontFamily?.value,
-    karaokeSize: karaokeFontSize?.value,
-    karaokeColor: karaokePrimaryColor?.value,
-    karaokeActiveColor: karaokeActiveColor?.value,
-    karaokePos: karaokePosition?.value,
-    karaokeUpper: karaokeUppercase?.checked ?? true,
   };
   const all = loadPresetsFromStorage();
   const existing = all.findIndex((p) => p.name === name);
@@ -2258,13 +1962,6 @@ function applyPreset(preset) {
   if (loudnessNormalize) loudnessNormalize.checked = !!preset.loudness;
   if (mp4AudioTrack && preset.mp4Audio)       setSelectValue(mp4AudioTrack, preset.mp4Audio);
   if (mp4ColorFilter && preset.mp4Filter)     setSelectValue(mp4ColorFilter, preset.mp4Filter);
-  if (preset.karaokePreset) applyKaraokePreset(preset.karaokePreset);
-  if (karaokeFontFamily && preset.karaokeFont) setSelectValue(karaokeFontFamily, preset.karaokeFont);
-  if (karaokeFontSize && preset.karaokeSize) setSelectValue(karaokeFontSize, preset.karaokeSize);
-  if (karaokePrimaryColor && preset.karaokeColor) karaokePrimaryColor.value = preset.karaokeColor;
-  if (karaokeActiveColor && preset.karaokeActiveColor) karaokeActiveColor.value = preset.karaokeActiveColor;
-  if (karaokePosition && preset.karaokePos) setSelectValue(karaokePosition, preset.karaokePos);
-  if (karaokeUppercase && preset.karaokeUpper !== undefined) karaokeUppercase.checked = preset.karaokeUpper;
 
   updateModeUI({ resetFiles: false });
   savePreferences();
@@ -2291,8 +1988,6 @@ function generateShareUrl() {
     params.set("width", gifWidth.value);
     params.set("fps", gifFps.value);
     if (gifSpeed?.value && gifSpeed.value !== "1") params.set("speed", gifSpeed.value);
-  } else if (mode === "karaoke") {
-    params.set("k_preset", activePresetId);
   }
   const url = new URL(window.location.href);
   url.search = params.toString();
@@ -2331,7 +2026,7 @@ function applyUrlParams() {
   try {
     const params = new URLSearchParams(search);
     const mode = params.get("mode");
-    if (mode && ["audio", "mp4", "gif", "karaoke"].includes(mode)) {
+    if (mode && ["audio", "mp4", "gif"].includes(mode)) {
       setCheckedValue("mode", mode);
     }
     if (params.has("format")) setCheckedValue("format", params.get("format"));
@@ -2348,7 +2043,6 @@ function applyUrlParams() {
     if (params.has("gif_out")) setCheckedValue("gif-output", params.get("gif_out"));
     if (params.has("width")) setSelectValue(gifWidth, params.get("width"));
     if (params.has("fps")) setSelectValue(gifFps, params.get("fps"));
-    if (params.has("k_preset")) applyKaraokePreset(params.get("k_preset"));
 
     savePreferences();
     setStatus("Configuration loaded from URL link.");
@@ -2385,522 +2079,9 @@ function getAtempoChain(speed) {
   return filters.join(",");
 }
 
-// =====================================================================
-// Sprint 5 — Karaoke & Dynamic Subtitles Logic
-// =====================================================================
-
-function detectLyricsLanguage(text) {
-  if (!text) return "spanish";
-  const lower = text.toLowerCase();
-  if (/[áéíóúñ¿¡]/.test(lower)) return "spanish";
-  const spanishHits = (lower.match(/\b(de|que|en|el|la|los|las|por|para|con|un|una|del|al|es|son|mi|tu|su|yo|gracias|corazon|corazón|vida|padre|amor|cuna|tierra|fuerte)\b/g) || []).length;
-  const englishHits = (lower.match(/\b(the|and|to|of|in|i|you|that|it|he|was|for|on|are|as|with|his|they|at|be|this|have|from)\b/g) || []).length;
-  return spanishHits >= englishHits ? "spanish" : "english";
-}
-
 let visualizerAnimFrame = null;
 
-function initKaraokeStudio() {
-  if (!karaokeSettings) return;
 
-  // Tabs switching
-  if (karaokeTabPaste && karaokeTabImport) {
-    karaokeTabPaste.addEventListener("click", () => {
-      karaokeTabPaste.classList.add("is-active");
-      karaokeTabImport.classList.remove("is-active");
-      karaokePanelPaste.classList.remove("is-hidden");
-      karaokePanelImport.classList.add("is-hidden");
-    });
-    karaokeTabImport.addEventListener("click", () => {
-      karaokeTabImport.classList.add("is-active");
-      karaokeTabPaste.classList.remove("is-active");
-      karaokePanelImport.classList.remove("is-hidden");
-      karaokePanelPaste.classList.add("is-hidden");
-    });
-  }
-
-  // Parse lyrics button
-  if (karaokePrepareBtn) {
-    karaokePrepareBtn.addEventListener("click", () => {
-      const text = (karaokeLyricsInput?.value || "").trim();
-      if (!text) {
-        showError("Please paste some lyrics or script in the text box.");
-        karaokeLyricsInput?.focus();
-        return;
-      }
-      clearError();
-      const words = splitLyricsIntoWords(text, {
-        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
-        preserveLineBreaks: true,
-      });
-      karaokeEngine.setWords(words);
-      renderWordChipsQueue();
-      setStatus(`Prepared ${words.length} words for synchronization. Play the preview and tap Space, or click Auto-Sync!`);
-    });
-  }
-
-  // Auto-Sync Button (Whisper AI + Forced Alignment & DSP Fallback)
-  if (karaokeAutoSyncBtn) {
-    karaokeAutoSyncBtn.addEventListener("click", async () => {
-      const text = (karaokeLyricsInput?.value || "").trim();
-      if (!text) {
-        showError("Please paste your lyrics or script in the box first.");
-        karaokeLyricsInput?.focus();
-        return;
-      }
-
-      const words = splitLyricsIntoWords(text, {
-        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
-        preserveLineBreaks: true,
-      });
-
-      const activeFile = selectedFiles[0];
-      if (!activeFile) {
-        showError("Please select an audio or video file first.");
-        return;
-      }
-
-      clearError();
-      karaokeAutoSyncBtn.disabled = true;
-      if (karaokeAiProgressBar) karaokeAiProgressBar.classList.remove("is-hidden");
-      if (karaokeAiProgressFill) karaokeAiProgressFill.style.width = "5%";
-
-      const updateAiStatus = (msg, percent = null) => {
-        setStatus(`⚡ ${msg}`);
-        if (karaokeAiStatusLabel) karaokeAiStatusLabel.textContent = msg;
-        if (percent !== null && karaokeAiProgressFill) {
-          karaokeAiProgressFill.style.width = `${Math.min(100, Math.max(5, percent))}%`;
-        }
-      };
-
-      try {
-        updateAiStatus("Extracting audio with FFmpeg.wasm...", 15);
-        const targetBuffer = await getMediaAudioBuffer(activeFile);
-        const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
-
-        if (!targetBuffer) {
-          throw new Error("Could not extract PCM audio data from media file.");
-        }
-
-        const lang = detectLyricsLanguage(text);
-        updateAiStatus(`Connecting to in-browser Whisper AI (${lang.toUpperCase()})...`, 25);
-
-        // Run client-side Whisper ASR with progress tracking and language acceleration
-        const whisperChunks = await transcribeWithWhisperAI(targetBuffer, { language: lang }, (prog) => {
-          if (prog.status === "downloading") {
-            updateAiStatus(`Downloading Whisper AI model (~39MB): ${prog.percent}%`, Math.round(25 + (prog.percent * 0.45)));
-          } else if (prog.status === "transcribing" || prog.status === "chunk") {
-            updateAiStatus(prog.message || "AI recognizing sung words...", prog.percent || 75);
-          } else if (prog.message) {
-            updateAiStatus(prog.message);
-          }
-        });
-
-        updateAiStatus("Aligning lyrics with recognized vocal phonemes...", 95);
-
-        let alignedWords = [];
-        if (whisperChunks && whisperChunks.length > 0) {
-          alignedWords = alignLyricsWithWhisperChunks(words, whisperChunks);
-        } else {
-          // Fallback to DSP if no chunks returned
-          const previewTime = videoPreview?.currentTime || 0;
-          alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
-            leadInOffset: 0.12,
-            snapToOnsets: true,
-            startTime: previewTime > 1.5 ? previewTime : undefined,
-          });
-        }
-
-        karaokeEngine.setWords(alignedWords);
-        renderWordChipsQueue();
-        updateSubtitleOverlay();
-
-        updateAiStatus(`Synchronized! ${alignedWords.length} words matched with AI.`, 100);
-        if (karaokeAiDesc) {
-          const startSec = alignedWords[0]?.start ?? 0;
-          karaokeAiDesc.innerHTML = `✅ <strong>Sincronización con IA exitosa</strong>: ${alignedWords.length} palabras alineadas con precisión milimétrica. La primera voz entra en <strong>${formatDuration(startSec)}</strong>.`;
-        }
-        setStatus(`✨ Auto-aligned ${alignedWords.length} words with in-browser Whisper AI! First vocal at ${formatDuration(alignedWords[0]?.start ?? 0)}.`);
-      } catch (aiErr) {
-        console.warn("Whisper AI alignment failed or offline, falling back to DSP auto-sync:", aiErr);
-        updateAiStatus("Falling back to acoustic DSP auto-sync...", 50);
-
-        const targetBuffer = await getMediaAudioBuffer(activeFile);
-        const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
-        const previewTime = videoPreview?.currentTime || 0;
-
-        const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
-          leadInOffset: 0.12,
-          snapToOnsets: true,
-          startTime: previewTime > 1.5 ? previewTime : undefined,
-        });
-
-        karaokeEngine.setWords(alignedWords);
-        renderWordChipsQueue();
-        updateSubtitleOverlay();
-
-        const firstWordStart = alignedWords[0]?.start ?? 0;
-        setStatus(`⚡ Auto-aligned ${alignedWords.length} words! First vocal starts at ${formatDuration(firstWordStart)}.`);
-      } finally {
-        karaokeAutoSyncBtn.disabled = false;
-        setTimeout(() => {
-          if (karaokeAiProgressBar) karaokeAiProgressBar.classList.add("is-hidden");
-        }, 3500);
-      }
-    });
-  }
-
-  // Fast DSP Sync Button (0.02s acoustic heuristic without AI download)
-  if (karaokeDspSyncBtn) {
-    karaokeDspSyncBtn.addEventListener("click", async () => {
-      const text = (karaokeLyricsInput?.value || "").trim();
-      if (!text) {
-        showError("Please paste your lyrics or script in the box first.");
-        karaokeLyricsInput?.focus();
-        return;
-      }
-
-      const words = splitLyricsIntoWords(text, {
-        wordsPerBlock: parseInt(karaokeWordsPerBlock?.value, 10) || 3,
-        preserveLineBreaks: true,
-      });
-
-      const activeFile = selectedFiles[0];
-      clearError();
-      setStatus("⚡ Analyzing acoustic rhythm and vocal energy (Fast DSP)...");
-
-      const targetBuffer = await getMediaAudioBuffer(activeFile);
-      const mediaDuration = targetBuffer?.duration || videoPreview.duration || (fileMetadata.get(activeFile)?.duration) || 30;
-      const previewTime = videoPreview?.currentTime || 0;
-
-      const alignedWords = autoAlignLyricsWithAudio(words, targetBuffer || { duration: mediaDuration }, {
-        leadInOffset: 0.12,
-        snapToOnsets: true,
-        startTime: previewTime > 1.5 ? previewTime : undefined,
-      });
-
-      karaokeEngine.setWords(alignedWords);
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
-
-      const firstWordStart = alignedWords[0]?.start ?? 0;
-      setStatus(`⚡ Fast DSP aligned ${alignedWords.length} words! First vocal at ${formatDuration(firstWordStart)}.`);
-    });
-  }
-
-  // Fine Offset Timestamps Buttons (±0.2s)
-  if (karaokeOffsetMinus) {
-    karaokeOffsetMinus.addEventListener("click", () => {
-      if (!karaokeEngine.words.length) return;
-      shiftTimestamps(karaokeEngine.words, -0.2);
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
-      setStatus("Shifted timestamps -0.2s earlier.");
-    });
-  }
-
-  if (karaokeOffsetPlus) {
-    karaokeOffsetPlus.addEventListener("click", () => {
-      if (!karaokeEngine.words.length) return;
-      shiftTimestamps(karaokeEngine.words, +0.2);
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
-      setStatus("Shifted timestamps +0.2s later.");
-    });
-  }
-
-  // Subtitle File Import
-  if (karaokeFileInput) {
-    karaokeFileInput.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const ext = getFileExtension(file.name);
-        let words = [];
-        if (ext === "lrc") {
-          words = parseLrc(text);
-        } else if (ext === "srt" || ext === "vtt") {
-          words = parseSrt(text);
-        } else if (ext === "json") {
-          words = JSON.parse(text);
-        } else {
-          words = parseSrt(text);
-        }
-
-        if (!words.length) {
-          showError("Could not find timestamped words in the imported file.");
-          return;
-        }
-
-        karaokeEngine.setWords(words);
-        renderWordChipsQueue();
-        setStatus(`Imported ${words.length} synced words from "${file.name}".`);
-      } catch (err) {
-        showError(`Error reading subtitle file: ${err.message}`);
-      }
-    });
-  }
-
-  // Tap-to-Sync Controls
-  if (karaokeTapBtn) {
-    karaokeTapBtn.addEventListener("click", () => {
-      handleSyncTap();
-    });
-  }
-
-  if (karaokeUndoBtn) {
-    karaokeUndoBtn.addEventListener("click", () => {
-      if (karaokeEngine.undoTap()) {
-        renderWordChipsQueue();
-        updateSubtitleOverlay();
-      }
-    });
-  }
-
-  if (karaokeResetBtn) {
-    karaokeResetBtn.addEventListener("click", () => {
-      karaokeEngine.resetSync();
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
-      setStatus("Sync timestamps reset.");
-    });
-  }
-
-  // Spacebar hotkey listener for tap-to-sync
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && getMode() === "karaoke") {
-      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
-      if (activeTag === "textarea" || activeTag === "input") return; // Don't intercept while typing text
-      if (karaokeEngine.words.length > 0) {
-        e.preventDefault();
-        handleSyncTap();
-      }
-    }
-  });
-
-  // Presets selector
-  karaokePresetCards.forEach((card) => {
-    card.addEventListener("click", () => {
-      const presetId = card.dataset.preset;
-      applyKaraokePreset(presetId);
-    });
-  });
-
-  // Custom Controls Listeners
-  [karaokeFontFamily, karaokeFontSize, karaokePrimaryColor, karaokeActiveColor, karaokePosition, karaokeUppercase].forEach((control) => {
-    if (control) {
-      control.addEventListener("input", () => {
-        karaokeEngine.setStyle(getActiveKaraokeStyle());
-        updateSubtitleOverlay();
-        savePreferences();
-      });
-    }
-  });
-
-  // Download buttons
-  if (karaokeDlLrc) {
-    karaokeDlLrc.addEventListener("click", () => {
-      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
-      const lrcContent = exportLrc(karaokeEngine.words, { title: selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "Track" });
-      const blob = new Blob([lrcContent], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "karaoke"}.lrc`);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
-  }
-
-  if (karaokeDlSrt) {
-    karaokeDlSrt.addEventListener("click", () => {
-      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
-      const srtContent = exportSrt(karaokeEngine.words, { uppercase: karaokeUppercase?.checked });
-      const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "subtitles"}.srt`);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
-  }
-
-  if (karaokeDlAss) {
-    karaokeDlAss.addEventListener("click", () => {
-      if (!karaokeEngine.words.length) { showError("No words to export."); return; }
-      const assContent = exportAss(karaokeEngine.words, getActiveKaraokeStyle());
-      const blob = new Blob([assContent], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      forceDownload(url, `${selectedFiles[0] ? safeBaseName(selectedFiles[0].name) : "styled-subtitles"}.ass`);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
-  }
-}
-
-function handleSyncTap() {
-  if (!karaokeEngine.words.length) return;
-  const currentTime = videoPreview.currentTime || 0;
-  const syncedWord = karaokeEngine.recordTap(currentTime);
-  if (syncedWord) {
-    renderWordChipsQueue();
-    updateSubtitleOverlay();
-  } else {
-    setStatus("All words in the queue have been synchronized! You can now burn or export.");
-  }
-}
-
-function getActiveKaraokeStyle() {
-  const basePreset = SUBTITLE_PRESETS[activePresetId] || SUBTITLE_PRESETS.tiktok;
-  return {
-    ...basePreset,
-    fontFamily: karaokeFontFamily?.value || basePreset.fontFamily,
-    fontSize: parseInt(karaokeFontSize?.value, 10) || basePreset.fontSize,
-    primaryColor: karaokePrimaryColor?.value || basePreset.primaryColor,
-    activeColor: karaokeActiveColor?.value || basePreset.activeColor,
-    position: karaokePosition?.value || basePreset.position,
-    uppercase: karaokeUppercase?.checked ?? basePreset.uppercase,
-  };
-}
-
-function applyKaraokePreset(presetId) {
-  const preset = SUBTITLE_PRESETS[presetId];
-  if (!preset) return;
-  activePresetId = presetId;
-  karaokePresetCards.forEach((c) => c.classList.toggle("is-active", c.dataset.preset === presetId));
-
-  if (karaokeFontFamily) setSelectValue(karaokeFontFamily, preset.fontFamily);
-  if (karaokeFontSize) setSelectValue(karaokeFontSize, String(preset.fontSize));
-  if (karaokePrimaryColor) karaokePrimaryColor.value = preset.primaryColor;
-  if (karaokeActiveColor) karaokeActiveColor.value = preset.activeColor;
-  if (karaokePosition) setSelectValue(karaokePosition, preset.position);
-  if (karaokeUppercase) karaokeUppercase.checked = !!preset.uppercase;
-
-  karaokeEngine.setStyle(getActiveKaraokeStyle());
-  updateSubtitleOverlay();
-  savePreferences();
-}
-
-function renderWordChipsQueue() {
-  if (!karaokeWordsQueue) return;
-  karaokeWordsQueue.replaceChildren();
-
-  const words = karaokeEngine.words;
-  if (!words.length) {
-    const hint = document.createElement("p");
-    hint.className = "karaoke-empty-hint";
-    hint.textContent = "Paste lyrics above and click 'Prepare Words for Sync' or 'Auto-Sync with Audio' to start.";
-    karaokeWordsQueue.appendChild(hint);
-    if (karaokeTapBtn) karaokeTapBtn.disabled = true;
-    if (karaokeUndoBtn) karaokeUndoBtn.disabled = true;
-    if (karaokeResetBtn) karaokeResetBtn.disabled = true;
-    if (karaokeOffsetMinus) karaokeOffsetMinus.disabled = true;
-    if (karaokeOffsetPlus) karaokeOffsetPlus.disabled = true;
-    if (karaokeSyncCounter) karaokeSyncCounter.textContent = "0 / 0";
-    return;
-  }
-
-  const hasAnySynced = words.some((w) => w.start !== null);
-  if (karaokeTapBtn) karaokeTapBtn.disabled = false;
-  if (karaokeUndoBtn) karaokeUndoBtn.disabled = karaokeEngine.currentIndex === 0;
-  if (karaokeResetBtn) karaokeResetBtn.disabled = false;
-  if (karaokeOffsetMinus) karaokeOffsetMinus.disabled = !hasAnySynced;
-  if (karaokeOffsetPlus) karaokeOffsetPlus.disabled = !hasAnySynced;
-
-  const syncedCount = words.filter((w) => w.start !== null).length;
-  if (karaokeSyncCounter) {
-    karaokeSyncCounter.textContent = `${syncedCount} / ${words.length}`;
-  }
-
-  let activeChipEl = null;
-
-  words.forEach((w, idx) => {
-    const chip = document.createElement("span");
-    chip.className = "word-chip";
-    if (idx === karaokeEngine.currentIndex) {
-      chip.classList.add("is-active");
-      activeChipEl = chip;
-    } else if (w.start !== null) {
-      chip.classList.add("is-synced");
-    } else {
-      chip.classList.add("is-pending");
-    }
-
-    chip.textContent = w.text;
-
-    if (w.start !== null) {
-      const timeSpan = document.createElement("span");
-      timeSpan.className = "chip-time";
-      timeSpan.textContent = formatDuration(w.start);
-      chip.appendChild(timeSpan);
-    }
-
-    // Click word chip to seek video and set as active word
-    chip.addEventListener("click", () => {
-      karaokeEngine.currentIndex = idx;
-      if (w.start !== null) {
-        videoPreview.currentTime = w.start;
-      }
-      renderWordChipsQueue();
-      updateSubtitleOverlay();
-    });
-
-    karaokeWordsQueue.appendChild(chip);
-  });
-
-  if (activeChipEl) {
-    activeChipEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }
-}
-
-function updateSubtitleOverlay() {
-  if (!dynamicSubtitleOverlay || !dynamicSubtitleBox) return;
-  if (getMode() !== "karaoke" || !karaokeEngine.words.length) {
-    dynamicSubtitleBox.replaceChildren();
-    return;
-  }
-
-  const currentTime = videoPreview.currentTime || 0;
-  const state = karaokeEngine.getActiveRenderState(currentTime);
-  const style = getActiveKaraokeStyle();
-
-  // Position class on overlay
-  dynamicSubtitleOverlay.className = `dynamic-subtitle-overlay pos-${style.position}`;
-
-  if (!state || !state.blockWords || !state.blockWords.length) {
-    dynamicSubtitleBox.replaceChildren();
-    return;
-  }
-
-  dynamicSubtitleBox.replaceChildren();
-
-  state.blockWords.forEach((w) => {
-    const wordSpan = document.createElement("span");
-    wordSpan.className = "sub-word";
-    wordSpan.textContent = style.uppercase ? w.text.toUpperCase() : w.text;
-
-    // Apply inline style properties
-    wordSpan.style.fontFamily = style.fontFamily;
-    wordSpan.style.fontSize = `${style.fontSize}px`;
-    wordSpan.style.webkitTextStroke = `${style.strokeWidth}px ${style.strokeColor}`;
-    wordSpan.style.textShadow = style.glow
-      ? `0 0 16px ${style.activeColor}, 0 4px 8px rgba(0,0,0,0.8)`
-      : `0 ${style.shadowDistance}px 10px ${style.shadowColor}`;
-
-    const isCurrentActive = state.activeWord && state.activeWord.id === w.id;
-    const isPassed = w.end !== null && currentTime > w.end;
-
-    if (isCurrentActive) {
-      wordSpan.classList.add("active");
-      wordSpan.style.color = style.activeColor;
-    } else if (isPassed) {
-      wordSpan.classList.add("passed");
-      wordSpan.style.color = style.activeColor;
-      wordSpan.style.opacity = "0.9";
-    } else {
-      wordSpan.classList.add("upcoming");
-      wordSpan.style.color = style.primaryColor;
-      wordSpan.style.opacity = "0.75";
-    }
-
-    dynamicSubtitleBox.appendChild(wordSpan);
-  });
-}
 
 // Audio Visualizer for Audio-Only Playback
 function renderAudioVisualizerFrame() {
@@ -2989,7 +2170,6 @@ function setLanguage(lang) {
   });
 
   if (presetNameInput) presetNameInput.placeholder = dict.preset_name_placeholder || "Preset name…";
-  if (karaokeLyricsInput) karaokeLyricsInput.placeholder = dict.karaoke_lyrics_placeholder || "Paste your lyrics or script here...";
 
   updateLocalizedModeContent();
   updateModeUI({ resetFiles: false });
@@ -3022,14 +2202,6 @@ function updateLocalizedModeContent() {
     modeContent.gif.dropHint = dict.drop_hint_gif || "Choose a short clip with Trim for the best result";
     modeContent.gif.busy = dict.busy_gif || "Creating GIF...";
     modeContent.gif.ready = dict.ready_gif || "video(s) ready for GIF creation.";
-  }
-  if (modeContent.karaoke) {
-    modeContent.karaoke.button = dict.btn_convert_karaoke || "Burn & Export MP4";
-    modeContent.karaoke.empty = dict.status_ready || "Select video or audio to start Karaoke & Subtitles.";
-    modeContent.karaoke.dropTitle = dict.drop_title_karaoke || "Select video or audio for Karaoke / Subtitles";
-    modeContent.karaoke.dropHint = dict.drop_hint_karaoke || "Upload your video or song, then paste lyrics below to sync";
-    modeContent.karaoke.busy = dict.busy_karaoke || "Generating subtitled video...";
-    modeContent.karaoke.ready = dict.ready_karaoke || "video(s) ready for subtitle creation & burning.";
   }
 }
 

@@ -666,7 +666,6 @@ async function convertFile(file, mode, index, trim) {
     await cleanupFiles(
       ...(wroteInput ? [inputName] : []),
       ...(wroteSrt ? [srtName] : []),
-      ...(wroteAss ? [assName] : []),
       ...(wroteExtAudio && extAudioName ? [extAudioName] : []),
       ...(wroteOutput ? [outputName] : [])
     );

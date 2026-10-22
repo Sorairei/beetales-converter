@@ -371,6 +371,25 @@
             </fieldset>
           </div>
 
+          <fieldset class="trim-settings">
+            <legend data-i18n="trim_legend">Trim (optional)</legend>
+            <div class="time-grid">
+              <label>
+                <span data-i18n="start_time">Start time</span>
+                <input id="trim-start" name="trim-start" type="text" inputmode="numeric" placeholder="00:00" autocomplete="off" />
+              </label>
+              <label>
+                <span data-i18n="end_time">End time</span>
+                <input id="trim-end" name="trim-end" type="text" inputmode="numeric" placeholder="Full length" autocomplete="off" />
+              </label>
+            </div>
+            <p class="setting-help" data-i18n="trim_help">Use MM:SS or HH:MM:SS. Leave both fields empty to convert the complete file.</p>
+          </fieldset>
+
+          <div class="mp4-note is-hidden" id="mp4-note" data-i18n="mp4_note">
+            MP4 conversion and optimization use local ffmpeg.wasm and may take longer than audio extraction.
+          </div>
+
           <div class="gif-note is-hidden" id="gif-note" data-i18n="gif_note">
             GIF clips are limited to 15 seconds to protect browser memory. Use Trim to choose the best moment.
           </div>

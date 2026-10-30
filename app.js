@@ -277,6 +277,10 @@ updateModeUI({ resetFiles: false });
 renderPresets();
 updateHistoryBadge();
 
+// Security (F-02): Maximum file size accepted before passing to WebAssembly heap.
+// Files larger than this limit will cause tab crashes (OOM) with no recovery path.
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+
 async function handleFiles(fileCollection) {
   if (conversionInProgress) return;
   clearError();
@@ -284,8 +288,19 @@ async function handleFiles(fileCollection) {
   setProgress(0);
   const mode = getMode();
   const incoming = Array.from(fileCollection || []);
-  const validFiles = incoming.filter((file) => isValidFileForMode(file, mode));
-  const rejected = incoming.length - validFiles.length;
+
+  // F-02: Reject files exceeding the size limit BEFORE any WASM memory allocation.
+  const oversized = incoming.filter((f) => f.size > MAX_FILE_SIZE_BYTES);
+  const sizeAccepted = incoming.filter((f) => f.size <= MAX_FILE_SIZE_BYTES);
+  if (oversized.length) {
+    showError(
+      `${oversized.length} file${oversized.length === 1 ? "" : "s"} exceed the 2 GB limit and ` +
+      `${oversized.length === 1 ? "was" : "were"} excluded. Large files may exhaust browser memory.`
+    );
+  }
+
+  const validFiles = sizeAccepted.filter((file) => isValidFileForMode(file, mode));
+  const rejected = sizeAccepted.length - validFiles.length;
   selectedFiles = validFiles;
   fileMetadata.clear();
   fileStates.clear();
@@ -294,7 +309,7 @@ async function handleFiles(fileCollection) {
   renderQueue();
 
   if (!selectedFiles.length) {
-    if (incoming.length) showError(getValidationMessage(mode));
+    if (incoming.length && !oversized.length) showError(getValidationMessage(mode));
     setStatus(modeContent[mode].empty);
     return;
   }
@@ -341,7 +356,14 @@ function renderQueue() {
     const state = document.createElement("em");
     name.textContent = file.name;
     size.textContent = formatBytes(file.size);
-    state.innerHTML = fileStates.get(file) || formatMediaMetadata(fileMetadata.get(file));
+    // HTML-01: Use safe DOM construction instead of innerHTML to eliminate
+    // the last user-data-derived innerHTML assignment in the codebase.
+    const stateText = fileStates.get(file);
+    if (stateText) {
+      state.textContent = stateText;
+    } else {
+      buildMediaMetadataDom(state, fileMetadata.get(file));
+    }
     details.append(name, size, state);
 
     const remove = document.createElement("button");
@@ -582,7 +604,9 @@ function detectCodec(file) {
 
 function updatePreviewMetadata(file) {
   if (!file || !previewUrl) return;
-  previewMeta.innerHTML = formatMediaMetadata(fileMetadata.get(file));
+  // HTML-01: Build preview metadata via DOM API, no innerHTML.
+  previewMeta.replaceChildren();
+  buildMediaMetadataDom(previewMeta, fileMetadata.get(file));
 }
 
 function escapeHtml(value) {
@@ -601,6 +625,26 @@ function formatMediaMetadata(metadata) {
   if (metadata.fps) parts.push(`<span class="meta-tag">${escapeHtml(metadata.fps)} fps</span>`);
   parts.push(`<span class="meta-tag">${escapeHtml(formatDuration(metadata.duration))}</span>`);
   return parts.join("");
+}
+
+// HTML-01: Safe DOM-based equivalent of formatMediaMetadata().
+// Appends <span class="meta-tag"> children to `container` without any innerHTML.
+function buildMediaMetadataDom(container, metadata) {
+  container.replaceChildren();
+  if (!metadata || !Number.isFinite(metadata.duration)) {
+    container.textContent = "Details unavailable";
+    return;
+  }
+  const makeTag = (text) => {
+    const span = document.createElement("span");
+    span.className = "meta-tag";
+    span.textContent = text;
+    return span;
+  };
+  if (metadata.codec)                container.append(makeTag(metadata.codec));
+  if (metadata.width && metadata.height) container.append(makeTag(`${metadata.height}p`));
+  if (metadata.fps)                  container.append(makeTag(`${metadata.fps} fps`));
+  container.append(makeTag(formatDuration(metadata.duration)));
 }
 
 function getTrimRangeError(trim) {
@@ -628,6 +672,13 @@ async function convertFile(file, mode, index, trim) {
     wroteInput = true;
 
     if (mode === "mp4" && selectedSubtitlesFile) {
+      // F-03: Validate subtitle extension in JS — the HTML accept attribute can be
+      // bypassed via drag-and-drop. Block .ass/.ssa to avoid libass CVE exposure.
+      const ALLOWED_SUBTITLE_EXTS = ["srt", "vtt"];
+      const subtitleExt = getFileExtension(selectedSubtitlesFile.name);
+      if (!ALLOWED_SUBTITLE_EXTS.includes(subtitleExt)) {
+        throw new Error("subtitle-invalid-ext");
+      }
       await ffmpeg.writeFile(srtName, await fetchFile(selectedSubtitlesFile));
       wroteSrt = true;
     }
@@ -1049,8 +1100,10 @@ function setBusy(busy) {
   saveFrameButton.disabled = busy;
 }
 
+
 function getFriendlyError(error, mode) {
   const message = String(error?.message || error || "").toLowerCase();
+  if (message.includes("subtitle-invalid-ext")) return "Only .srt and .vtt subtitle files are supported. Please remove the current subtitle file and attach a valid one.";
   if (message.includes("worker") || message.includes("securityerror")) return "The browser blocked the conversion engine. Refresh and try again.";
   if (message.includes("timeout") || message.includes("abort")) return "The conversion engine took too long to load. Refresh and try again.";
   if (message.includes("memory")) return "The browser ran out of memory. Try fewer or smaller files.";
@@ -1404,26 +1457,25 @@ async function generateThumbnails(file) {
     if (thumbnailAbortToken !== myToken) return;
     const duration = fileMetadata.get(file)?.duration || videoPreview.duration || 10;
     const interval = duration / (TIMELINE_THUMBNAILS + 1);
-    const promises = [];
+    // F-07: Serialize thumbnail extraction instead of firing all 12 ffmpeg.exec()
+    // concurrently. The FFmpeg Worker is single-threaded, so Promise.all() only
+    // queues tasks without parallelism while accumulating WASM heap pressure.
     for (let i = 1; i <= TIMELINE_THUMBNAILS; i++) {
+      if (thumbnailAbortToken !== myToken) break;
       const time = interval * i;
       const outName = `thumb-${i}.jpg`;
-      promises.push(
-        ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName])
-          .then(() => ffmpeg.readFile(outName))
-          .then((data) => {
-            if (thumbnailAbortToken !== myToken) return;
-            const blob = new Blob([data], { type: "image/jpeg" });
-            const blobUrl = URL.createObjectURL(blob);
-            const img = new Image();
-            img.onload = () => URL.revokeObjectURL(blobUrl);
-            img.src = blobUrl;
-            thumbnailImages[i - 1] = img;
-          })
-          .catch(() => {})
-      );
+      try {
+        await ffmpeg.exec(["-hide_banner", "-y", "-ss", String(time), "-i", inputName, "-frames:v", "1", "-vf", "scale=64:-1", outName]);
+        const data = await ffmpeg.readFile(outName);
+        if (thumbnailAbortToken !== myToken) break;
+        const blob = new Blob([data], { type: "image/jpeg" });
+        const blobUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => URL.revokeObjectURL(blobUrl);
+        img.src = blobUrl;
+        thumbnailImages[i - 1] = img;
+      } catch { /* single thumbnail failure is non-fatal */ }
     }
-    await Promise.all(promises);
     if (thumbnailAbortToken !== myToken) return;
     timelineReady = true;
     refreshAccentColor();
@@ -2047,20 +2099,54 @@ function applyUrlParams() {
     if (mode && ["audio", "mp4", "gif"].includes(mode)) {
       setCheckedValue("mode", mode);
     }
-    if (params.has("format")) setCheckedValue("format", params.get("format"));
-    if (params.has("bitrate")) setCheckedValue("bitrate", params.get("bitrate"));
+    // F-10: Explicit whitelists for all URL parameters. setSelectValue() and
+    // setCheckedValue() are safe (DOM-only), but whitelisting prevents
+    // unexpected state from crafted share links.
+    const ALLOWED_FORMATS  = ["mp3", "wav", "aac"];
+    const ALLOWED_BITRATES = ["128k", "192k", "320k"];
+    const ALLOWED_QUALITY  = ["18", "23", "28"];
+    const ALLOWED_RES      = ["original", "1080", "720", "480"];
+    const ALLOWED_SPEEDS   = ["0.25", "0.5", "0.75", "1", "1.5", "2"];
+    const ALLOWED_AUDIO    = ["stereo", "mono", "mute"];
+    const ALLOWED_FILTERS  = ["none", "vivid", "contrast", "bw", "warm"];
+    const ALLOWED_GIF_OUT  = ["gif", "webp"];
+    const ALLOWED_GIF_W    = ["320", "480", "640"];
+    const ALLOWED_GIF_FPS  = ["8", "12", "15"];
+
+    const fmt = params.get("format");
+    if (fmt && ALLOWED_FORMATS.includes(fmt)) setCheckedValue("format", fmt);
+
+    const br = params.get("bitrate");
+    if (br && ALLOWED_BITRATES.includes(br)) setCheckedValue("bitrate", br);
+
     if (params.has("loudness") && loudnessNormalize) loudnessNormalize.checked = params.get("loudness") === "1";
-    if (params.has("quality")) setSelectValue(videoQuality, params.get("quality"));
-    if (params.has("res")) setSelectValue(videoResolution, params.get("res"));
-    if (params.has("speed")) {
-      if (videoSpeed) setSelectValue(videoSpeed, params.get("speed"));
-      if (gifSpeed) setSelectValue(gifSpeed, params.get("speed"));
+
+    const q = params.get("quality");
+    if (q && ALLOWED_QUALITY.includes(q)) setSelectValue(videoQuality, q);
+
+    const res = params.get("res");
+    if (res && ALLOWED_RES.includes(res)) setSelectValue(videoResolution, res);
+
+    const spd = params.get("speed");
+    if (spd && ALLOWED_SPEEDS.includes(spd)) {
+      if (videoSpeed) setSelectValue(videoSpeed, spd);
+      if (gifSpeed) setSelectValue(gifSpeed, spd);
     }
-    if (params.has("audio") && mp4AudioTrack) setSelectValue(mp4AudioTrack, params.get("audio"));
-    if (params.has("filter") && mp4ColorFilter) setSelectValue(mp4ColorFilter, params.get("filter"));
-    if (params.has("gif_out")) setCheckedValue("gif-output", params.get("gif_out"));
-    if (params.has("width")) setSelectValue(gifWidth, params.get("width"));
-    if (params.has("fps")) setSelectValue(gifFps, params.get("fps"));
+
+    const aud = params.get("audio");
+    if (aud && ALLOWED_AUDIO.includes(aud) && mp4AudioTrack) setSelectValue(mp4AudioTrack, aud);
+
+    const flt = params.get("filter");
+    if (flt && ALLOWED_FILTERS.includes(flt) && mp4ColorFilter) setSelectValue(mp4ColorFilter, flt);
+
+    const gifOut = params.get("gif_out");
+    if (gifOut && ALLOWED_GIF_OUT.includes(gifOut)) setCheckedValue("gif-output", gifOut);
+
+    const gw = params.get("width");
+    if (gw && ALLOWED_GIF_W.includes(gw)) setSelectValue(gifWidth, gw);
+
+    const fps = params.get("fps");
+    if (fps && ALLOWED_GIF_FPS.includes(fps)) setSelectValue(gifFps, fps);
 
     savePreferences();
     setStatus("Configuration loaded from URL link.");

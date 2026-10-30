@@ -3,6 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Security: Content Security Policy (F-01) -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self';
+        img-src 'self' blob: data:;
+        media-src 'self' blob:;
+        worker-src 'self' blob:;
+        connect-src 'self';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        frame-ancestors 'none';
+      "
+    />
+    <!-- Security: No referrer on outbound links (META-01) -->
+    <meta name="referrer" content="no-referrer" />
     <title>BeeTales Media Converter</title>
     <meta
       name="description"
